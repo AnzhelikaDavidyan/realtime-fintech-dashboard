@@ -39,7 +39,7 @@ jobs:
 
       - name: Build Wasm
         if: hashFiles('wasm/Cargo.toml') != ''
-        run: wasm-pack build wasm --target web --release
+        run: npm run build:wasm
 
       - name: Test Wasm
         if: hashFiles('wasm/Cargo.toml') != ''

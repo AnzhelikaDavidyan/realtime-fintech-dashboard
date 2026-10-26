@@ -28,6 +28,11 @@
               {
                 "glob": "**/*",
                 "input": "public"
+              },
+              {
+                "glob": "*.wasm",
+                "input": "wasm/pkg",
+                "output": "wasm"
               }
             ],
             "styles": ["src/styles.scss"]

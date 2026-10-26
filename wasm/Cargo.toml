@@ -1,0 +1,18 @@
+[package]
+name = "findev-wasm"
+version = "0.1.0"
+edition = "2024"
+description = "Market data producer for the findev dashboard, compiled to WebAssembly"
+repository = "https://github.com/AnzhelikaDavidyan/realtime-fintech-dashboard"
+publish = false
+
+[lib]
+# cdylib for wasm-pack, rlib so `cargo test` runs natively.
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wasm-bindgen = "0.2.129"
+
+[profile.release]
+opt-level = "s"
+lto = true
