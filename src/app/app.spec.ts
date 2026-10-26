@@ -31,4 +31,13 @@ describe('App', () => {
     await fixture.whenStable();
     expect(fixture.nativeElement.querySelector('h1')?.textContent).toBe('Settings');
   });
+
+  it('shows the not-found page for unknown urls', async () => {
+    const fixture = TestBed.createComponent(App);
+    const router = TestBed.inject(Router);
+    await router.navigateByUrl('/does-not-exist');
+    await fixture.whenStable();
+    expect(router.url).toBe('/does-not-exist');
+    expect(fixture.nativeElement.querySelector('h1')?.textContent).toBe('Page not found');
+  });
 });

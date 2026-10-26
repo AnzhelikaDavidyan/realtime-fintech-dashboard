@@ -12,5 +12,9 @@ export const routes: Routes = [
     title: 'Settings · Findev',
     loadComponent: () => import('./pages/settings/settings').then((m) => m.Settings),
   },
-  { path: '**', redirectTo: 'dashboard' },
+  {
+    path: '**',
+    title: 'Page not found · Findev',
+    loadComponent: () => import('./pages/not-found/not-found').then((m) => m.NotFound),
+  },
 ];
