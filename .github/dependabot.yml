@@ -1,0 +1,44 @@
+# Weekly update PRs for workflow actions (including the SHA-pinned ones),
+# npm packages and the Rust crate. Every PR runs CI before it can be merged.
+# Commit messages use "chore:" with no scope, matching commitlint.config.mjs.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: chore
+    groups:
+      github-actions:
+        patterns: ['*']
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: chore
+    open-pull-requests-limit: 5
+    groups:
+      # Angular packages must move together, so they come as one PR.
+      angular:
+        patterns: ['@angular/*', '@angular-devkit/*', '@schematics/angular', 'angular-eslint']
+      dev-tooling:
+        dependency-type: development
+        exclude-patterns:
+          ['@angular/*', '@angular-devkit/*', '@schematics/angular', 'angular-eslint']
+        update-types: [minor, patch]
+
+  - package-ecosystem: cargo
+    directory: /wasm
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: chore
+    groups:
+      rust:
+        patterns: ['*']
