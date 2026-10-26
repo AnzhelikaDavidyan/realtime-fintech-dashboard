@@ -9,11 +9,13 @@ import { MARKET_UPDATE_STRIDE, MarketUpdateField as F } from './market-update';
  * Sums use float64: they are exact while sum(price × qty) stays below 2^53.
  */
 export class MetricsAggregator {
-  private readonly hasQuote: Uint8Array;
+  /** 1 once a bid/ask has arrived for the instrument; tells "not seen yet" apart from a real 0. */
+  private readonly hasBidAsk: Uint8Array;
   private readonly bid: Int32Array;
   private readonly ask: Int32Array;
   private readonly bidQty: Int32Array;
   private readonly askQty: Int32Array;
+  /** 1 once the instrument has traded at least once. */
   private readonly hasTrade: Uint8Array;
   private readonly lastPrice: Int32Array;
   private readonly volume: Float64Array;
@@ -23,7 +25,7 @@ export class MetricsAggregator {
     if (!Number.isInteger(instruments) || instruments < 1) {
       throw new RangeError(`instruments must be a positive integer, got ${instruments}`);
     }
-    this.hasQuote = new Uint8Array(instruments);
+    this.hasBidAsk = new Uint8Array(instruments);
     this.bid = new Int32Array(instruments);
     this.ask = new Int32Array(instruments);
     this.bidQty = new Int32Array(instruments);
@@ -44,7 +46,7 @@ export class MetricsAggregator {
     for (let i = 0; i < batch.length; i += MARKET_UPDATE_STRIDE) {
       const id = batch[i + F.Instrument];
       this.assertInstrument(id);
-      this.hasQuote[id] = 1;
+      this.hasBidAsk[id] = 1;
       this.bid[id] = batch[i + F.Bid];
       this.ask[id] = batch[i + F.Ask];
       this.bidQty[id] = batch[i + F.BidQty];
@@ -64,19 +66,19 @@ export class MetricsAggregator {
   /** Current metrics for one instrument. */
   metrics(instrument: number): InstrumentMetrics {
     this.assertInstrument(instrument);
-    const quoted = this.hasQuote[instrument] === 1;
+    const bidAskKnown = this.hasBidAsk[instrument] === 1;
     const traded = this.hasTrade[instrument] === 1;
     const volume = this.volume[instrument];
     const bookQty = this.bidQty[instrument] + this.askQty[instrument];
     return {
       instrument,
-      bid: quoted ? this.bid[instrument] : null,
-      ask: quoted ? this.ask[instrument] : null,
-      bidQty: quoted ? this.bidQty[instrument] : null,
-      askQty: quoted ? this.askQty[instrument] : null,
-      spread: quoted ? this.ask[instrument] - this.bid[instrument] : null,
+      bid: bidAskKnown ? this.bid[instrument] : null,
+      ask: bidAskKnown ? this.ask[instrument] : null,
+      bidQty: bidAskKnown ? this.bidQty[instrument] : null,
+      askQty: bidAskKnown ? this.askQty[instrument] : null,
+      spread: bidAskKnown ? this.ask[instrument] - this.bid[instrument] : null,
       imbalance:
-        quoted && bookQty > 0
+        bidAskKnown && bookQty > 0
           ? (this.bidQty[instrument] - this.askQty[instrument]) / bookQty
           : null,
       lastPrice: traded ? this.lastPrice[instrument] : null,
@@ -93,7 +95,7 @@ export class MetricsAggregator {
   /** Clears all accumulators. */
   reset(): void {
     for (const array of [
-      this.hasQuote,
+      this.hasBidAsk,
       this.bid,
       this.ask,
       this.bidQty,

@@ -163,7 +163,7 @@ describe('MetricsAggregator', () => {
       expect(agg.metrics(1)).toMatchObject({ lastPrice: 200, volume: 3, vwap: 200 });
     });
 
-    it('keeps each instrument’s own quote when both are quoted', () => {
+    it('keeps each instrument’s own bid/ask when both have one', () => {
       const agg = new MetricsAggregator(2);
       agg.ingest(batch({ instrument: 0, bid: 100, ask: 102, bidQty: 5, askQty: 6 }));
       agg.ingest(batch({ instrument: 1, bid: 900, ask: 910, bidQty: 50, askQty: 60 }));
