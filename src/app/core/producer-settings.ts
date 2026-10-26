@@ -6,7 +6,7 @@ export interface ProducerSettings {
   readonly instruments: number;
   /** Target market updates generated per second. */
   readonly updatesPerSecond: number;
-  /** How often the worker posts a metrics snapshot to the UI, in milliseconds. */
+  /** How often the worker posts a metrics snapshot to the UI, in milliseconds (at most 10 per second). */
   readonly snapshotIntervalMs: number;
 }
 
@@ -19,14 +19,14 @@ export const PRODUCER_SETTINGS_LIMITS: Readonly<Record<keyof ProducerSettings, R
   seed: { min: 0, max: Number.MAX_SAFE_INTEGER },
   instruments: { min: 1, max: 100 },
   updatesPerSecond: { min: 1, max: 100_000 },
-  snapshotIntervalMs: { min: 50, max: 5_000 },
+  snapshotIntervalMs: { min: 100, max: 5_000 },
 };
 
 export const DEFAULT_PRODUCER_SETTINGS: ProducerSettings = {
   seed: 42,
   instruments: 10,
   updatesPerSecond: 1_000,
-  snapshotIntervalMs: 250,
+  snapshotIntervalMs: 100,
 };
 
 /**

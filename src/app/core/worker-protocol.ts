@@ -17,8 +17,10 @@ export type WorkerEvent =
   | { readonly type: 'ready'; readonly producerVersion: string }
   | {
       readonly type: 'snapshot';
+      /** Run the snapshot belongs to, so late snapshots from a previous run can be ignored. */
+      readonly runId: number;
       readonly metrics: readonly InstrumentMetrics[];
-      /** Updates processed since the worker started. */
+      /** Updates generated since the run started. */
       readonly totalUpdates: number;
       /** `performance.now()` in the worker when the snapshot was taken. */
       readonly timestamp: number;
