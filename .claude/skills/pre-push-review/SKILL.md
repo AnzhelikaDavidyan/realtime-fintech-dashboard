@@ -53,7 +53,7 @@ If nothing is worth raising: `✅ Pre-push review: no optimization suggestions f
 
 ## 4. Record the marker
 
-After reporting, mark this HEAD as reviewed so the push hook lets the push through:
+After reporting, mark this HEAD as reviewed so the push hook lets the push through. Run this as its own command: the hook checks before a command runs, so a marker written in the same command as `git push` is too late.
 
 ```bash
 git rev-parse HEAD > "$(git rev-parse --git-path claude-pre-push-reviewed)"
