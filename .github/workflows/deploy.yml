@@ -1,0 +1,82 @@
+name: CI and deploy
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# One deployment at a time; a newer push waits instead of cancelling a deploy mid-flight.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Rust steps run once the crate exists in wasm/.
+      - name: Install Rust
+        if: hashFiles('wasm/Cargo.toml') != ''
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        if: hashFiles('wasm/Cargo.toml') != ''
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack
+
+      - name: Cache Rust build
+        if: hashFiles('wasm/Cargo.toml') != ''
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: wasm
+
+      - name: Build Wasm
+        if: hashFiles('wasm/Cargo.toml') != ''
+        run: wasm-pack build wasm --target web --release
+
+      - name: Test Wasm
+        if: hashFiles('wasm/Cargo.toml') != ''
+        run: cargo test --manifest-path wasm/Cargo.toml
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Test Angular
+        run: npx ng test --watch=false
+
+      - name: Build Angular
+        run: npx ng build --base-href "/${{ github.event.repository.name }}/"
+
+      # GitHub Pages serves 404.html for unknown paths, so deep links load the SPA.
+      - name: Add SPA fallback
+        run: cp dist/findev/browser/index.html dist/findev/browser/404.html
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist/findev/browser
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@v6
+
+      - id: deployment
+        uses: actions/deploy-pages@v5
