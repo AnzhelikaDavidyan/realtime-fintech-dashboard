@@ -22,14 +22,20 @@ updates:
     commit-message:
       prefix: chore
     open-pull-requests-limit: 5
+    ignore:
+      # Each Angular release supports one TypeScript minor (Angular 22: >=6.0 <6.1),
+      # so only patches are safe on their own. Move to a new TypeScript with `ng update`.
+      - dependency-name: typescript
+        update-types: ['version-update:semver-major', 'version-update:semver-minor']
     groups:
-      # Angular packages must move together, so they come as one PR.
+      # Angular packages and the TypeScript they depend on must move together, so they come as one PR.
       angular:
-        patterns: ['@angular/*', '@angular-devkit/*', '@schematics/angular', 'angular-eslint']
+        patterns:
+          ['@angular/*', '@angular-devkit/*', '@schematics/angular', 'angular-eslint', 'typescript']
       dev-tooling:
         dependency-type: development
         exclude-patterns:
-          ['@angular/*', '@angular-devkit/*', '@schematics/angular', 'angular-eslint']
+          ['@angular/*', '@angular-devkit/*', '@schematics/angular', 'angular-eslint', 'typescript']
         update-types: [minor, patch]
 
   - package-ecosystem: cargo

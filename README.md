@@ -27,10 +27,15 @@ Live demo: https://anzhelikadavidyan.github.io/realtime-fintech-dashboard/
 
 ## CI/CD
 
-| Workflow                                     | Runs on                           | Does                                                                                       |
-| -------------------------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------ |
-| [`ci.yml`](.github/workflows/ci.yml)         | Pull requests, pushes to branches | Rust: fmt, clippy, tests. Angular: format, lint, unit tests (JUnit report artifact), build |
-| [`deploy.yml`](.github/workflows/deploy.yml) | Pushes to `main`                  | Runs `ci.yml` first; only if it passes, builds and deploys to GitHub Pages                 |
+| Workflow                                     | Runs on                                | Does                                                                                       |
+| -------------------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------ |
+| [`ci.yml`](.github/workflows/ci.yml)         | Pull requests; manual run from Actions | Rust: fmt, clippy, tests. Angular: format, lint, unit tests (JUnit report artifact), build |
+| [`deploy.yml`](.github/workflows/deploy.yml) | Pushes to `main`                       | Runs `ci.yml` first; only if it passes, builds and deploys to GitHub Pages                 |
 
-On pull requests and branches, a newer push cancels the older CI run. On `main`, runs queue so a
-deploy is never cut off halfway.
+CI runs once per pull request push, and a newer push cancels the older run. On `main`, runs queue
+so a deploy is never cut off halfway. To test a branch without opening a PR, use **Actions → CI →
+Run workflow**.
+
+[Dependabot](.github/dependabot.yml) opens weekly update PRs for actions, npm and cargo. Angular
+and TypeScript are updated together; TypeScript minor and major versions are skipped because each
+Angular release supports only one TypeScript minor — upgrade those with `ng update`.

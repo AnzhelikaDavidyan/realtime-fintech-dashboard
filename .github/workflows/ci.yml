@@ -1,17 +1,17 @@
 name: CI
 
-# Runs every check and unit test. Pull requests and branch pushes trigger it
-# directly; main runs it through deploy.yml, where it gates the deployment.
+# Runs every check and unit test. Pull requests trigger it directly (once per
+# push, not also for the branch push); main runs it through deploy.yml, where
+# it gates the deployment. Any other branch can be run from the Actions tab.
 on:
   pull_request:
-  push:
-    branches-ignore: [main]
+  workflow_dispatch:
   workflow_call:
 
 permissions:
   contents: read
 
-# A newer push to the same PR or branch makes the older run pointless.
+# A newer push to the same PR makes the older run pointless.
 # Runs on main (called from deploy.yml) are never cancelled; they queue instead.
 concurrency:
   group: ci-${{ github.event_name }}-${{ github.ref }}
