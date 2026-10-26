@@ -1,0 +1,50 @@
+.shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.shell__header {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  padding: 0 1.5rem;
+  height: 56px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.shell__brand {
+  font-weight: 700;
+  font-size: 1.125rem;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.shell__nav {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.shell__link {
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  color: var(--text-muted);
+  text-decoration: none;
+
+  &:hover {
+    color: var(--text);
+    background: var(--surface-hover);
+  }
+
+  &--active {
+    color: var(--text);
+    background: var(--surface-hover);
+    font-weight: 600;
+  }
+}
+
+.shell__content {
+  flex: 1;
+  padding: 1.5rem;
+}

@@ -1,0 +1,21 @@
+<div class="shell">
+  <header class="shell__header">
+    <a class="shell__brand" routerLink="/dashboard">Findev</a>
+    <nav class="shell__nav" aria-label="Main">
+      @for (item of navItems; track item.path) {
+        <a
+          class="shell__link"
+          [routerLink]="item.path"
+          routerLinkActive="shell__link--active"
+          ariaCurrentWhenActive="page"
+        >
+          {{ item.label }}
+        </a>
+      }
+    </nav>
+  </header>
+
+  <main class="shell__content">
+    <router-outlet />
+  </main>
+</div>
