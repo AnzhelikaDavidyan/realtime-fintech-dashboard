@@ -1,59 +1,8 @@
 import { MARKET_UPDATE_STRIDE } from '../core/market-update';
 import { decodeMetrics } from '../core/metrics-codec';
 import { WorkerEvent } from '../core/worker-protocol';
-import {
-  BatchGenerator,
-  MAX_TICK_GAP_MS,
-  ProducerEngine,
-  Scheduler,
-  TICK_MS,
-} from './producer-engine';
-
-/** Manual clock and scheduler: time only moves when the test calls `advance`. */
-class FakeTime implements Scheduler {
-  now = 1_000;
-  private timers = new Map<number, { interval: number; next: number; callback: () => void }>();
-  private nextId = 0;
-
-  readonly clock = () => this.now;
-
-  every(interval: number, callback: () => void): () => void {
-    const id = this.nextId++;
-    this.timers.set(id, { interval, next: this.now + interval, callback });
-    return () => this.timers.delete(id);
-  }
-
-  get activeTimers(): number {
-    return this.timers.size;
-  }
-
-  /** Moves time forward, firing due timers in order. */
-  advance(ms: number): void {
-    const end = this.now + ms;
-    for (;;) {
-      const due = [...this.timers.entries()]
-        .filter(([, t]) => t.next <= end)
-        .sort(([, a], [, b]) => a.next - b.next)[0];
-      if (!due) break;
-      const [, timer] = due;
-      this.now = timer.next;
-      timer.next += timer.interval;
-      timer.callback();
-    }
-    this.now = end;
-  }
-
-  /**
-   * Jumps the clock without firing timers, like a frozen background tab.
-   * Missed ticks are dropped, as browsers do, not replayed afterwards.
-   */
-  jump(ms: number): void {
-    this.now += ms;
-    for (const timer of this.timers.values()) {
-      timer.next = this.now + timer.interval;
-    }
-  }
-}
+import { BatchGenerator, MAX_TICK_GAP_MS, ProducerEngine, TICK_MS } from './producer-engine';
+import { FakeTime } from './testing/fake-time';
 
 /** Generator stub: valid updates spread over instruments, trade quantity 1. */
 class FakeGenerator implements BatchGenerator {
@@ -128,26 +77,6 @@ describe('ProducerEngine', () => {
       engine.start(1, { instruments: 0 });
       expect(generators[0].instruments).toBe(1);
     });
-
-    it('resets state when a new run starts', () => {
-      const { engine, time, snapshots, generators } = setup();
-      engine.start(1, settings);
-      time.advance(500);
-      engine.start(2, { ...settings, seed: 99 });
-
-      expect(engine.totalUpdates).toBe(0);
-      expect(time.activeTimers).toBe(1);
-      expect(generators[1].seed).toBe(99);
-
-      const before = snapshots().length;
-      time.advance(200);
-      const fresh = snapshots().slice(before);
-      expect(fresh.length).toBeGreaterThan(0);
-      expect(fresh.every((s) => s.runId === 2)).toBe(true);
-      expect(fresh.at(-1)!.totalUpdates).toBe(200);
-      // The first run's generator is no longer used.
-      expect(generators[0].generator.requested).toHaveLength(10);
-    });
   });
 
   describe('snapshots', () => {
@@ -185,33 +114,155 @@ describe('ProducerEngine', () => {
     });
   });
 
-  describe('pause and resume', () => {
-    it('pause stops the timer and generation', () => {
-      const { engine, time, statuses } = setup();
-      engine.start(1, settings);
-      time.advance(200);
-      engine.pause();
+  describe('pause, resume and run switching', () => {
+    /** Sum of traded volume across instruments in a snapshot. */
+    const volumeOf = (s: Extract<WorkerEvent, { type: 'snapshot' }>) =>
+      decodeMetrics(s.metrics).reduce((sum, m) => sum + m.volume, 0);
 
-      expect(engine.status).toBe('paused');
-      expect(time.activeTimers).toBe(0);
-      expect(statuses()).toEqual(['running', 'paused']);
+    describe('pause', () => {
+      it('stops batches: the generator is not called again', () => {
+        const { engine, time, generators } = setup();
+        engine.start(1, settings);
+        time.advance(200);
+        const calls = generators[0].generator.requested.length;
 
-      time.advance(5_000);
-      expect(engine.totalUpdates).toBe(200);
+        engine.pause();
+        time.advance(5_000);
+
+        expect(generators[0].generator.requested).toHaveLength(calls);
+        expect(engine.totalUpdates).toBe(200);
+        expect(time.activeTimers).toBe(0);
+      });
+
+      it('stops snapshots while paused', () => {
+        const { engine, time, snapshots } = setup();
+        engine.start(1, settings);
+        time.advance(300);
+        engine.pause();
+        const count = snapshots().length;
+        time.advance(5_000);
+        expect(snapshots()).toHaveLength(count);
+      });
     });
 
-    it('resume continues without catching up on paused time', () => {
-      const { engine, time, snapshots } = setup();
-      engine.start(1, settings);
-      time.advance(200);
-      engine.pause();
-      time.advance(10_000);
-      engine.resume();
-      time.advance(300);
+    describe('resume', () => {
+      it('keeps the totals from before the pause', () => {
+        const { engine, time, snapshots } = setup();
+        engine.start(1, settings);
+        time.advance(300);
+        engine.pause();
+        const before = snapshots().at(-1)!;
 
-      expect(engine.status).toBe('running');
-      expect(engine.totalUpdates).toBe(500);
-      expect(snapshots().at(-1)!.runId).toBe(1);
+        engine.resume();
+        expect(engine.totalUpdates).toBe(300);
+
+        time.advance(100);
+        const after = snapshots().at(-1)!;
+        expect(after.totalUpdates).toBe(before.totalUpdates + 100);
+        expect(volumeOf(after)).toBe(volumeOf(before) + 100);
+      });
+
+      it('generates nothing for the paused time', () => {
+        const { engine, time, generators } = setup();
+        engine.start(1, settings);
+        time.advance(200);
+        engine.pause();
+        time.advance(10_000);
+        engine.resume();
+        time.advance(TICK_MS);
+
+        // First batch after resume covers one tick, not the 10 s pause.
+        expect(generators[0].generator.requested.at(-1)).toBe(TICK_MS);
+        time.advance(300 - TICK_MS);
+        expect(engine.totalUpdates).toBe(200 + 300);
+      });
+
+      it('does not catch up even after a pause longer than the gap limit', () => {
+        const { engine, time } = setup();
+        engine.start(1, settings);
+        engine.pause();
+        time.advance(60_000);
+        engine.resume();
+        time.advance(100);
+        expect(engine.totalUpdates).toBe(100);
+      });
+    });
+
+    describe('new run', () => {
+      it('resets totals and metrics', () => {
+        const { engine, time, snapshots } = setup();
+        engine.start(1, settings);
+        time.advance(700);
+        engine.start(2, settings);
+
+        expect(engine.totalUpdates).toBe(0);
+        time.advance(100);
+        const first = snapshots().at(-1)!;
+        expect(first.runId).toBe(2);
+        expect(first.totalUpdates).toBe(100);
+        expect(volumeOf(first)).toBe(100);
+      });
+
+      it('uses a fresh generator and stops calling the old one', () => {
+        const { engine, time, generators } = setup();
+        engine.start(1, settings);
+        time.advance(200);
+        engine.start(2, { ...settings, seed: 99 });
+        const oldCalls = generators[0].generator.requested.length;
+        time.advance(1_000);
+
+        expect(generators[1].seed).toBe(99);
+        expect(generators[0].generator.requested).toHaveLength(oldCalls);
+        expect(time.activeTimers).toBe(1);
+      });
+
+      it('resets a paused run and starts running', () => {
+        const { engine, time } = setup();
+        engine.start(1, settings);
+        time.advance(400);
+        engine.pause();
+        engine.start(2, settings);
+        time.advance(100);
+
+        expect(engine.status).toBe('running');
+        expect(engine.totalUpdates).toBe(100);
+      });
+    });
+
+    describe('run ids', () => {
+      it('never sends the old run id after switching, even with a snapshot due', () => {
+        const { engine, time, snapshots } = setup();
+        engine.start(1, settings);
+        time.advance(450); // run 1's next snapshot would be due at 500
+        const switchedAt = snapshots().length;
+        engine.start(2, settings);
+        time.advance(2_000);
+
+        const after = snapshots().slice(switchedAt);
+        expect(after.length).toBeGreaterThan(0);
+        expect(after.map((s) => s.runId)).toEqual(after.map(() => 2));
+      });
+
+      it('only moves forward across several switches, including from pause', () => {
+        const { engine, time, snapshots } = setup();
+        const switches: [runId: number, from: number][] = [];
+        for (const runId of [1, 2, 3, 4]) {
+          switches.push([runId, snapshots().length]);
+          engine.start(runId, settings);
+          time.advance(250);
+          if (runId === 2) engine.pause();
+        }
+        time.advance(500);
+
+        for (const [runId, from] of switches) {
+          expect(
+            snapshots()
+              .slice(from)
+              .every((s) => s.runId >= runId),
+          ).toBe(true);
+        }
+        expect(snapshots().at(-1)!.runId).toBe(4);
+      });
     });
 
     it('limits make-up work after a long gap between ticks', () => {

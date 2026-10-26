@@ -2,36 +2,8 @@ import { MARKET_UPDATE_STRIDE } from '../core/market-update';
 import { decodeMetrics } from '../core/metrics-codec';
 import { WorkerEvent } from '../core/worker-protocol';
 import { ProducerWasm } from './load-producer-wasm';
-import { Scheduler } from './producer-engine';
 import { ProducerWorkerHost } from './producer-worker-host';
-
-/** Manual clock and timers: time only moves on `advance`. */
-class FakeTime implements Scheduler {
-  now = 0;
-  private timers = new Map<number, { interval: number; next: number; callback: () => void }>();
-  private id = 0;
-  readonly clock = () => this.now;
-
-  every(interval: number, callback: () => void): () => void {
-    const id = this.id++;
-    this.timers.set(id, { interval, next: this.now + interval, callback });
-    return () => this.timers.delete(id);
-  }
-
-  advance(ms: number): void {
-    const end = this.now + ms;
-    for (;;) {
-      const due = [...this.timers.values()]
-        .filter((t) => t.next <= end)
-        .sort((a, b) => a.next - b.next)[0];
-      if (!due) break;
-      this.now = due.next;
-      due.next += due.interval;
-      due.callback();
-    }
-    this.now = end;
-  }
-}
+import { FakeTime } from './testing/fake-time';
 
 const fakeWasm: ProducerWasm = {
   version: '0.1.0',
@@ -47,7 +19,7 @@ const fakeWasm: ProducerWasm = {
 };
 
 function setup(loadWasm: () => Promise<ProducerWasm> = () => Promise.resolve(fakeWasm)) {
-  const time = new FakeTime();
+  const time = new FakeTime(0);
   const posted: { message: WorkerEvent; transfer: Transferable[] }[] = [];
   const host = new ProducerWorkerHost({
     port: { postMessage: (message, transfer) => posted.push({ message, transfer }) },
