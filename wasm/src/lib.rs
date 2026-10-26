@@ -1,5 +1,9 @@
 use wasm_bindgen::prelude::*;
 
+mod rng;
+
+pub use rng::Rng;
+
 /// Crate version, so the app can confirm which producer build it loaded.
 #[wasm_bindgen]
 pub fn version() -> String {
