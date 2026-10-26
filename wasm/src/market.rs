@@ -7,8 +7,8 @@ use crate::rng::Rng;
 /// Prices are integer ticks (no floating point for money); quantities are lots.
 pub const UPDATE_STRIDE: usize = 7;
 
-/// Largest mid-price move per update, in ticks.
-const MAX_STEP: i32 = 3;
+/// Largest mid-price move per update of an instrument, in ticks.
+pub const MAX_STEP: i32 = 3;
 /// Spread stays within [1, MAX_SPREAD] ticks, so bid < ask always holds.
 const MAX_SPREAD: i32 = 10;
 /// Keeping mid >= MAX_SPREAD keeps bid = mid - spread / 2 >= 1.
@@ -117,6 +117,7 @@ impl MarketGenerator {
     }
 }
 
+// Behaviour through the public API is covered in tests/generator.rs; these check internal limits.
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -125,67 +126,20 @@ mod tests {
         let batch = MarketGenerator::try_new(seed, instruments)
             .unwrap()
             .generate_batch(n);
-        assert_eq!(batch.len(), n * UPDATE_STRIDE);
         let (chunks, rest) = batch.as_chunks::<UPDATE_STRIDE>();
         assert!(rest.is_empty());
         chunks.to_vec()
     }
 
     #[test]
-    fn rejects_zero_instruments() {
-        assert!(MarketGenerator::try_new(1, 0).is_err());
-    }
-
-    #[test]
-    fn empty_batch() {
-        assert!(updates(1, 3, 0).is_empty());
-    }
-
-    #[test]
-    fn same_seed_same_updates() {
-        assert_eq!(updates(42, 5, 500), updates(42, 5, 500));
-        assert_ne!(updates(42, 5, 50), updates(43, 5, 50));
-    }
-
-    #[test]
-    fn batches_continue_the_same_stream() {
-        let mut generator = MarketGenerator::try_new(7, 4).unwrap();
-        let mut split = generator.generate_batch(30);
-        split.extend(generator.generate_batch(70));
-        let whole = MarketGenerator::try_new(7, 4).unwrap().generate_batch(100);
-        assert_eq!(split, whole);
-    }
-
-    #[test]
-    fn every_update_is_valid() {
-        let count = 8;
-        for [id, bid, ask, bid_qty, ask_qty, trade_price, trade_qty] in updates(99, count, 50_000) {
-            assert!((0..count as i32).contains(&id));
-            assert!(bid >= 1 && bid < ask, "bid {bid} must be below ask {ask}");
+    fn stays_within_internal_limits() {
+        for [_, bid, ask, bid_qty, ask_qty, _, trade_qty] in updates(99, 8, 50_000) {
             assert!(ask - bid <= MAX_SPREAD);
+            assert!(bid >= 1 && ask <= MAX_MID + MAX_SPREAD);
             assert!((1..=MAX_QTY).contains(&bid_qty));
             assert!((1..=MAX_QTY).contains(&ask_qty));
-            assert!(trade_price == bid || trade_price == ask);
-            assert!((1..=MAX_TRADE).contains(&trade_qty));
+            assert!(trade_qty <= MAX_TRADE);
         }
-    }
-
-    #[test]
-    fn mid_moves_by_small_steps_per_instrument() {
-        let count = 3;
-        let mut last_mid = vec![None; count as usize];
-        for [id, bid, ask, ..] in updates(5, count, 20_000) {
-            // bid = mid - spread / 2, so this recovers the stored mid exactly.
-            let mid = bid + (ask - bid) / 2;
-            let prev = last_mid[id as usize].replace(mid);
-            if let Some(prev) = prev {
-                assert!((mid - prev).abs() <= MAX_STEP, "jump {prev} -> {mid}");
-            }
-        }
-        assert!(
-            last_mid.iter().all(Option::is_some),
-            "every instrument updated"
-        );
     }
 
     #[test]
