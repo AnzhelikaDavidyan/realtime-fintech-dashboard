@@ -67,6 +67,7 @@ export class MetricsAggregator {
     const quoted = this.hasQuote[instrument] === 1;
     const traded = this.hasTrade[instrument] === 1;
     const volume = this.volume[instrument];
+    const bookQty = this.bidQty[instrument] + this.askQty[instrument];
     return {
       instrument,
       bid: quoted ? this.bid[instrument] : null,
@@ -74,6 +75,10 @@ export class MetricsAggregator {
       bidQty: quoted ? this.bidQty[instrument] : null,
       askQty: quoted ? this.askQty[instrument] : null,
       spread: quoted ? this.ask[instrument] - this.bid[instrument] : null,
+      imbalance:
+        quoted && bookQty > 0
+          ? (this.bidQty[instrument] - this.askQty[instrument]) / bookQty
+          : null,
       lastPrice: traded ? this.lastPrice[instrument] : null,
       volume,
       vwap: volume > 0 ? this.notional[instrument] / volume : null,

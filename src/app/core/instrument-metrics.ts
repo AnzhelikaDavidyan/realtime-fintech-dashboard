@@ -12,6 +12,11 @@ export interface InstrumentMetrics {
   readonly askQty: number | null;
   /** ask − bid, in ticks. */
   readonly spread: number | null;
+  /**
+   * Order-book imbalance, (bidQty − askQty) / (bidQty + askQty), from −1 to 1.
+   * Positive means more buying interest. Null when there is no quantity on the book.
+   */
+  readonly imbalance: number | null;
   readonly lastPrice: number | null;
   /** Total traded quantity, in lots. 0 before the first trade. */
   readonly volume: number;
