@@ -1,4 +1,5 @@
 import { MARKET_UPDATE_STRIDE } from '../core/market-update';
+import { decodeMetrics } from '../core/metrics-codec';
 import { WorkerEvent } from '../core/worker-protocol';
 import {
   BatchGenerator,
@@ -177,9 +178,9 @@ describe('ProducerEngine', () => {
       time.advance(300);
       const last = snapshots().at(-1)!;
       expect(snapshots().every((s) => s.runId === 42)).toBe(true);
-      expect(last.metrics.map((m) => m.instrument)).toEqual([0, 1, 2]);
+      expect(decodeMetrics(last.metrics).map((m) => m.instrument)).toEqual([0, 1, 2]);
       expect(last.totalUpdates).toBe(300);
-      expect(last.metrics.reduce((sum, m) => sum + m.volume, 0)).toBe(300);
+      expect(decodeMetrics(last.metrics).reduce((sum, m) => sum + m.volume, 0)).toBe(300);
       expect(last.timestamp).toBe(time.now);
     });
   });

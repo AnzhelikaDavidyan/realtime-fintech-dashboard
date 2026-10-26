@@ -1,4 +1,5 @@
 import { MetricsAggregator } from '../core/metrics-aggregator';
+import { encodeMetrics } from '../core/metrics-codec';
 import { normalizeProducerSettings, ProducerSettings } from '../core/producer-settings';
 import { WorkerEvent, WorkerStatus } from '../core/worker-protocol';
 
@@ -141,7 +142,7 @@ export class ProducerEngine {
       this.deps.emit({
         type: 'snapshot',
         runId: this.runId,
-        metrics: metrics.snapshot(),
+        metrics: encodeMetrics(metrics.snapshot()),
         totalUpdates: this.generated,
         timestamp: now,
       });
