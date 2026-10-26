@@ -1,7 +1,9 @@
 use wasm_bindgen::prelude::*;
 
+mod market;
 mod rng;
 
+pub use market::{MarketGenerator, UPDATE_STRIDE};
 pub use rng::Rng;
 
 /// Crate version, so the app can confirm which producer build it loaded.
