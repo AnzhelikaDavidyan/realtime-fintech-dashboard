@@ -13,37 +13,28 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Same checks and tests as pull requests; nothing is deployed unless they pass.
+  ci:
+    uses: ./.github/workflows/ci.yml
+
   build:
+    needs: ci
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
 
-      # Rust steps run once the crate exists in wasm/.
-      - name: Install Rust
-        if: hashFiles('wasm/Cargo.toml') != ''
-        uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
 
-      - name: Install wasm-pack
-        if: hashFiles('wasm/Cargo.toml') != ''
-        uses: taiki-e/install-action@v2
+      - uses: taiki-e/install-action@v2
         with:
           tool: wasm-pack
 
-      - name: Cache Rust build
-        if: hashFiles('wasm/Cargo.toml') != ''
-        uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@v2
         with:
           workspaces: wasm
-
-      - name: Build Wasm
-        if: hashFiles('wasm/Cargo.toml') != ''
-        run: npm run build:wasm
-
-      - name: Test Wasm
-        if: hashFiles('wasm/Cargo.toml') != ''
-        run: cargo test --manifest-path wasm/Cargo.toml
 
       - uses: actions/setup-node@v7
         with:
@@ -52,8 +43,8 @@ jobs:
 
       - run: npm ci
 
-      - name: Test Angular
-        run: npx ng test --watch=false
+      - name: Build Wasm
+        run: npm run build:wasm
 
       - name: Build Angular
         run: npx ng build --base-href "/${{ github.event.repository.name }}/"
@@ -69,6 +60,7 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       pages: write
       id-token: write
