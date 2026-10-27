@@ -3,33 +3,9 @@ import { TestBed } from '@angular/core/testing';
 import { InstrumentMetrics } from '../core/instrument-metrics';
 import { encodeMetrics } from '../core/metrics-codec';
 import { DEFAULT_PRODUCER_SETTINGS } from '../core/producer-settings';
-import { WorkerCommand, WorkerEvent } from '../core/worker-protocol';
-import { PRODUCER_WORKER_FACTORY, ProducerService, ProducerWorker } from './producer.service';
-
-/** Records commands and lets the test play the worker's side. */
-class FakeWorker implements ProducerWorker {
-  onmessage: ((event: MessageEvent<WorkerEvent>) => void) | null = null;
-  onerror: ((event: ErrorEvent) => void) | null = null;
-  readonly sent: WorkerCommand[] = [];
-  terminated = false;
-
-  postMessage(command: WorkerCommand): void {
-    this.sent.push(command);
-  }
-
-  terminate(): void {
-    this.terminated = true;
-  }
-
-  /** Delivers an event as if the worker had posted it. */
-  emit(event: WorkerEvent): void {
-    this.onmessage?.(new MessageEvent('message', { data: event }));
-  }
-
-  crash(message: string): void {
-    this.onerror?.(new ErrorEvent('error', { message }));
-  }
-}
+import { WorkerEvent } from '../core/worker-protocol';
+import { ProducerService } from './producer.service';
+import { FakeProducerWorker, provideFakeProducerWorker } from './testing/fake-producer-worker';
 
 const row = (instrument: number, volume: number): InstrumentMetrics => ({
   instrument,
@@ -53,19 +29,8 @@ const snapshot = (runId: number, rows: InstrumentMetrics[]): WorkerEvent => ({
 });
 
 function setup() {
-  const workers: FakeWorker[] = [];
-  TestBed.configureTestingModule({
-    providers: [
-      {
-        provide: PRODUCER_WORKER_FACTORY,
-        useValue: () => {
-          const worker = new FakeWorker();
-          workers.push(worker);
-          return worker;
-        },
-      },
-    ],
-  });
+  const workers: FakeProducerWorker[] = [];
+  TestBed.configureTestingModule({ providers: [provideFakeProducerWorker(workers)] });
   const service = TestBed.inject(ProducerService);
   return { service, workers, worker: () => workers.at(-1)! };
 }
@@ -166,6 +131,13 @@ describe('ProducerService', () => {
         { type: 'start', runId: 2 },
       ]);
     });
+  });
+
+  it('clears an old error when a new run starts', () => {
+    const { service, worker } = setup();
+    worker().emit({ type: 'error', message: 'bad settings', command: 'start' });
+    service.apply({ instruments: 2 });
+    expect(service.error()).toBeNull();
   });
 
   describe('retry', () => {

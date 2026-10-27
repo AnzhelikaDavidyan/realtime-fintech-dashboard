@@ -87,6 +87,7 @@ export class ProducerService {
     this._runId.set(runId);
     this._activeSettings.set(settings);
     this._rows.set([]);
+    this._error.set(null);
     this.send({ type: 'init', settings });
     this.send({ type: 'start', runId });
   }

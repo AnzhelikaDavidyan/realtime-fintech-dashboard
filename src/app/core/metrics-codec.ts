@@ -20,6 +20,16 @@ export const METRICS_FIELDS = [
 
 export const METRICS_STRIDE = METRICS_FIELDS.length;
 
+type MetricsField = (typeof METRICS_FIELDS)[number];
+
+/** Column of each field, worked out once so decoding does no lookups per row. */
+const COL = Object.fromEntries(METRICS_FIELDS.map((field, col) => [field, col])) as Record<
+  MetricsField,
+  number
+>;
+
+const orNull = (value: number): number | null => (Number.isNaN(value) ? null : value);
+
 /** Packs metrics into a Float64Array of `metrics.length × METRICS_STRIDE` numbers. */
 export function encodeMetrics(metrics: readonly InstrumentMetrics[]): Float64Array {
   const out = new Float64Array(metrics.length * METRICS_STRIDE);
@@ -40,23 +50,17 @@ export function decodeMetrics(packed: Float64Array): InstrumentMetrics[] {
   }
   const rows: InstrumentMetrics[] = [];
   for (let i = 0; i < packed.length; i += METRICS_STRIDE) {
-    const at = (field: (typeof METRICS_FIELDS)[number]) =>
-      packed[i + METRICS_FIELDS.indexOf(field)];
-    const nullable = (field: (typeof METRICS_FIELDS)[number]) => {
-      const value = at(field);
-      return Number.isNaN(value) ? null : value;
-    };
     rows.push({
-      instrument: at('instrument'),
-      bid: nullable('bid'),
-      ask: nullable('ask'),
-      bidQty: nullable('bidQty'),
-      askQty: nullable('askQty'),
-      spread: nullable('spread'),
-      imbalance: nullable('imbalance'),
-      lastPrice: nullable('lastPrice'),
-      volume: at('volume'),
-      vwap: nullable('vwap'),
+      instrument: packed[i + COL.instrument],
+      bid: orNull(packed[i + COL.bid]),
+      ask: orNull(packed[i + COL.ask]),
+      bidQty: orNull(packed[i + COL.bidQty]),
+      askQty: orNull(packed[i + COL.askQty]),
+      spread: orNull(packed[i + COL.spread]),
+      imbalance: orNull(packed[i + COL.imbalance]),
+      lastPrice: orNull(packed[i + COL.lastPrice]),
+      volume: packed[i + COL.volume],
+      vwap: orNull(packed[i + COL.vwap]),
     });
   }
   return rows;

@@ -35,6 +35,24 @@ module.exports = defineConfig([
     },
   },
   {
+    // Test helpers (fakes, fake clocks) must never end up in the shipped app.
+    files: ['src/**/*.ts'],
+    ignores: ['src/**/*.spec.ts', 'src/**/testing/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/testing/*'],
+              message: 'Test helpers may only be imported from *.spec.ts files.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ['**/*.html'],
     extends: [angular.configs.templateRecommended, angular.configs.templateAccessibility],
     rules: {},
