@@ -47,17 +47,17 @@ export class Settings {
 
   /** Typed form, starting from the settings of the active run. */
   protected readonly form = new FormGroup({
-    instruments: settingControl('instruments', this.active().instruments),
+    instrumentCount: settingControl('instrumentCount', this.active().instrumentCount),
     updatesPerBatch: settingControl('updatesPerBatch', this.active().updatesPerBatch),
     batchIntervalMs: settingControl('batchIntervalMs', this.active().batchIntervalMs),
   });
 
   protected readonly fields: readonly FieldView[] = [
     {
-      key: 'instruments',
+      key: 'instrumentCount',
       label: 'Instrument count',
       hint: 'How many fictional instruments to simulate',
-      range: rangeText('instruments', this.locale),
+      range: rangeText('instrumentCount', this.locale),
     },
     {
       key: 'updatesPerBatch',
@@ -154,15 +154,15 @@ export class Settings {
       const { min, max } = PRODUCER_SETTINGS_LIMITS[key];
       return `${formatVolume(min, { locale: this.locale })}–${formatVolume(max, { locale: this.locale })}`;
     };
-    return `Whole numbers only. Instruments ${r('instruments')} · Updates ${r('updatesPerBatch')} · Interval ${r('batchIntervalMs')} ms`;
+    return `Whole numbers only. Instruments ${r('instrumentCount')} · Updates ${r('updatesPerBatch')} · Interval ${r('batchIntervalMs')} ms`;
   })();
 
   protected apply(): void {
     if (!this.canApply()) return;
-    const { instruments, updatesPerBatch, batchIntervalMs } = this.form.getRawValue();
+    const { instrumentCount, updatesPerBatch, batchIntervalMs } = this.form.getRawValue();
     this.applyService.apply({
       ...this.active(),
-      instruments: instruments!,
+      instrumentCount: instrumentCount!,
       updatesPerBatch: updatesPerBatch!,
       batchIntervalMs: batchIntervalMs!,
     });
@@ -172,7 +172,7 @@ export class Settings {
 
   protected resetToDefaults(): void {
     this.form.setValue({
-      instruments: DEFAULT_PRODUCER_SETTINGS.instruments,
+      instrumentCount: DEFAULT_PRODUCER_SETTINGS.instrumentCount,
       updatesPerBatch: DEFAULT_PRODUCER_SETTINGS.updatesPerBatch,
       batchIntervalMs: DEFAULT_PRODUCER_SETTINGS.batchIntervalMs,
     });

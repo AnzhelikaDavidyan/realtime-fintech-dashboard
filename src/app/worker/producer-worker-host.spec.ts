@@ -7,11 +7,11 @@ import { FakeTime } from './testing/fake-time';
 
 const fakeWasm: ProducerWasm = {
   version: '0.1.0',
-  createGenerator: (_seed, instruments) => ({
+  createGenerator: (_seed, instrumentCount) => ({
     generateBatch: (n) => {
       const out = new Int32Array(n * MARKET_UPDATE_STRIDE);
       for (let i = 0; i < n; i++) {
-        out.set([i % instruments, 100, 101, 10, 10, 101, 1], i * MARKET_UPDATE_STRIDE);
+        out.set([i % instrumentCount, 100, 101, 10, 10, 101, 1], i * MARKET_UPDATE_STRIDE);
       }
       return out;
     },
@@ -82,7 +82,7 @@ describe('ProducerWorkerHost', () => {
     it('queues commands sent before Wasm is ready and runs them afterwards', async () => {
       const wasm = deferred<ProducerWasm>();
       const { host, messages, ofType } = setup(() => wasm.promise);
-      host.receive({ type: 'init', settings: { instruments: 2 } });
+      host.receive({ type: 'init', settings: { instrumentCount: 2 } });
       host.receive({ type: 'start', runId: 5 });
       expect(messages()).toEqual([]);
 
@@ -112,7 +112,7 @@ describe('ProducerWorkerHost', () => {
       await host.loaded;
       host.receive({
         type: 'init',
-        settings: { instruments: 4, updatesPerBatch: 250, batchIntervalMs: 125 },
+        settings: { instrumentCount: 4, updatesPerBatch: 250, batchIntervalMs: 125 },
       });
       host.receive({ type: 'start', runId: 9 });
       time.advance(500);

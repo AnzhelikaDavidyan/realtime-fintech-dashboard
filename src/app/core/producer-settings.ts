@@ -2,8 +2,8 @@
 export interface ProducerSettings {
   /** PRNG seed; the same seed replays the same market. */
   readonly seed: number;
-  /** Number of simulated instruments. */
-  readonly instruments: number;
+  /** Number of simulated instruments (a count, not a list). */
+  readonly instrumentCount: number;
   /** Updates generated per batch, across all instruments. */
   readonly updatesPerBatch: number;
   /** Requested time between batches, in milliseconds. */
@@ -17,14 +17,14 @@ export interface Range {
 
 export const PRODUCER_SETTINGS_LIMITS: Readonly<Record<keyof ProducerSettings, Range>> = {
   seed: { min: 0, max: Number.MAX_SAFE_INTEGER },
-  instruments: { min: 1, max: 50 },
+  instrumentCount: { min: 1, max: 50 },
   updatesPerBatch: { min: 1, max: 1_000 },
   batchIntervalMs: { min: 50, max: 2_000 },
 };
 
 export const DEFAULT_PRODUCER_SETTINGS: ProducerSettings = {
   seed: 42,
-  instruments: 5,
+  instrumentCount: 5,
   updatesPerBatch: 100,
   batchIntervalMs: 500,
 };
@@ -41,7 +41,7 @@ export function nominalRate({ updatesPerBatch, batchIntervalMs }: ProducerSettin
 export function normalizeProducerSettings(input: Partial<ProducerSettings> = {}): ProducerSettings {
   return {
     seed: normalizeField(input, 'seed'),
-    instruments: normalizeField(input, 'instruments'),
+    instrumentCount: normalizeField(input, 'instrumentCount'),
     updatesPerBatch: normalizeField(input, 'updatesPerBatch'),
     batchIntervalMs: normalizeField(input, 'batchIntervalMs'),
   };

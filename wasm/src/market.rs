@@ -36,10 +36,10 @@ pub struct MarketGenerator {
 
 #[wasm_bindgen]
 impl MarketGenerator {
-    /// Creates a generator for `instruments` instruments (at least 1).
+    /// Creates a generator for `instrument_count` instruments (at least 1).
     #[wasm_bindgen(constructor)]
-    pub fn new(seed: u64, instruments: u32) -> Result<MarketGenerator, JsError> {
-        Self::try_new(seed, instruments).map_err(|e| JsError::new(&e))
+    pub fn new(seed: u64, instrument_count: u32) -> Result<MarketGenerator, JsError> {
+        Self::try_new(seed, instrument_count).map_err(|e| JsError::new(&e))
     }
 
     /// Number of integers per update (7).
@@ -60,12 +60,12 @@ impl MarketGenerator {
 }
 
 impl MarketGenerator {
-    pub fn try_new(seed: u64, instruments: u32) -> Result<MarketGenerator, String> {
-        if instruments == 0 {
+    pub fn try_new(seed: u64, instrument_count: u32) -> Result<MarketGenerator, String> {
+        if instrument_count == 0 {
             return Err("MarketGenerator needs at least 1 instrument".into());
         }
         let mut rng = Rng::new(seed);
-        let instruments = (0..instruments)
+        let instruments = (0..instrument_count)
             .map(|_| Instrument {
                 mid: rng.int_in_range(1_000, 100_000),
                 spread: rng.int_in_range(1, 5),
@@ -122,8 +122,8 @@ impl MarketGenerator {
 mod tests {
     use super::*;
 
-    fn updates(seed: u64, instruments: u32, n: usize) -> Vec<[i32; UPDATE_STRIDE]> {
-        let batch = MarketGenerator::try_new(seed, instruments)
+    fn updates(seed: u64, instrument_count: u32, n: usize) -> Vec<[i32; UPDATE_STRIDE]> {
+        let batch = MarketGenerator::try_new(seed, instrument_count)
             .unwrap()
             .generate_batch(n);
         let (chunks, rest) = batch.as_chunks::<UPDATE_STRIDE>();

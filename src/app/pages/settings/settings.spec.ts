@@ -12,7 +12,7 @@ import { MIN_APPLYING_MS } from './settings-apply';
 import { EDITABLE_KEYS } from './settings-form';
 
 const RANGE_MESSAGES = {
-  instruments: 'Must be between 1 and 50.',
+  instrumentCount: 'Must be between 1 and 50.',
   updatesPerBatch: 'Must be between 1 and 1,000.',
   batchIntervalMs: 'Must be between 50 and 2,000.',
 };
@@ -78,7 +78,7 @@ describe('Settings page', () => {
   describe('default state', () => {
     it('shows the active settings with their allowed ranges', () => {
       const { input, text, el } = setup();
-      expect(input('instruments').value).toBe('5');
+      expect(input('instrumentCount').value).toBe('5');
       expect(input('updatesPerBatch').value).toBe('100');
       expect(input('batchIntervalMs').value).toBe('500');
       expect([...el.querySelectorAll('.input__range')].map(text)).toEqual([
@@ -114,11 +114,11 @@ describe('Settings page', () => {
   describe('editing', () => {
     it('marks changed fields, updates the rate and enables Apply', async () => {
       const { type, wrapper, el, text, applyDisabled } = setup();
-      await type('instruments', '20');
+      await type('instrumentCount', '20');
       await type('updatesPerBatch', '1000');
       await type('batchIntervalMs', '50');
 
-      expect(wrapper('instruments').classList).toContain('input--changed');
+      expect(wrapper('instrumentCount').classList).toContain('input--changed');
       expect(text(el.querySelector('.rate'))).toContain('20,000 updates / second');
       expect(text(el.querySelector('.rate'))).toContain('(1000 × 1000 / 50)');
       expect(applyDisabled()).toBe(false);
@@ -129,27 +129,27 @@ describe('Settings page', () => {
 
     it('goes back to "nothing to apply" when the original value is typed again', async () => {
       const { type, wrapper, applyDisabled } = setup();
-      await type('instruments', '6');
-      await type('instruments', '5');
+      await type('instrumentCount', '6');
+      await type('instrumentCount', '5');
       expect(applyDisabled()).toBe(true);
-      expect(wrapper('instruments').classList).not.toContain('input--changed');
+      expect(wrapper('instrumentCount').classList).not.toContain('input--changed');
     });
   });
 
   describe('validation', () => {
     it('highlights the field and links the message to the input', async () => {
       const { type, input, wrapper } = setup();
-      await type('instruments', '0');
+      await type('instrumentCount', '0');
 
-      expect(wrapper('instruments').classList).toContain('input--invalid');
-      expect(input('instruments').getAttribute('aria-describedby')).toContain(
-        'setting-instruments-error',
+      expect(wrapper('instrumentCount').classList).toContain('input--invalid');
+      expect(input('instrumentCount').getAttribute('aria-describedby')).toContain(
+        'setting-instrumentCount-error',
       );
     });
 
     it('disables Apply, hides the rate and explains why', async () => {
       const { type, el, text, applyDisabled } = setup();
-      await type('instruments', '0');
+      await type('instrumentCount', '0');
       expect(applyDisabled()).toBe(true);
       expect(text(el.querySelector('.rate'))).toBe(
         'Nominal rate: — (fix the errors to see the rate)',
@@ -168,12 +168,12 @@ describe('Settings page', () => {
   describe('apply', () => {
     it('shows the form as matching the new run afterwards', async () => {
       const { type, apply, el, text, fixture, wrapper, applyDisabled } = setup();
-      await type('instruments', '20');
+      await type('instrumentCount', '20');
       apply().click();
       await fixture.whenStable();
 
       expect(applyDisabled()).toBe(true);
-      expect(wrapper('instruments').classList).not.toContain('input--changed');
+      expect(wrapper('instrumentCount').classList).not.toContain('input--changed');
       expect(text(el.querySelector('.help__item p'))).toBe(
         'Run #2 · 20 instruments · 100 updates every 500 ms',
       );
@@ -181,7 +181,7 @@ describe('Settings page', () => {
 
     it('does nothing while the form is invalid, even if submitted', async () => {
       const { type, producer, el, fixture } = setup();
-      await type('instruments', '0');
+      await type('instrumentCount', '0');
       el.querySelector('form')!.dispatchEvent(new Event('submit'));
       await fixture.whenStable();
       expect(producer.runId()).toBe(1);
@@ -191,19 +191,19 @@ describe('Settings page', () => {
   describe('reset to defaults', () => {
     it('restores the default values without applying them', async () => {
       const { producer } = setup();
-      producer.apply({ instruments: 30, updatesPerBatch: 7, batchIntervalMs: 900 });
+      producer.apply({ instrumentCount: 30, updatesPerBatch: 7, batchIntervalMs: 900 });
 
       // A page opened while a run with non-default settings is active.
       const page = TestBed.createComponent(Settings);
       page.detectChanges();
       const el = page.nativeElement as HTMLElement;
       const field = (key: string) => el.querySelector(`#setting-${key}`) as HTMLInputElement;
-      expect(field('instruments').value).toBe('30');
+      expect(field('instrumentCount').value).toBe('30');
 
       (el.querySelector('button[type="button"]') as HTMLButtonElement).click();
       await page.whenStable();
 
-      expect(field('instruments').value).toBe('5');
+      expect(field('instrumentCount').value).toBe('5');
       expect(field('updatesPerBatch').value).toBe('100');
       expect(field('batchIntervalMs').value).toBe('500');
       expect(producer.runId()).toBe(2);
@@ -216,10 +216,10 @@ describe('Settings page', () => {
 
     it('clears validation errors', async () => {
       const { type, reset, error, fixture } = setup();
-      await type('instruments', '0');
+      await type('instrumentCount', '0');
       reset().click();
       await fixture.whenStable();
-      expect(error('instruments')).toBe('');
+      expect(error('instrumentCount')).toBe('');
     });
   });
 
@@ -248,7 +248,7 @@ describe('Settings page', () => {
 
     it('keeps Apply disabled while any one field is invalid', async () => {
       const { type, applyDisabled } = setup();
-      await type('instruments', '20');
+      await type('instrumentCount', '20');
       await type('batchIntervalMs', '49');
       expect(applyDisabled()).toBe(true);
       await type('batchIntervalMs', '50');
@@ -258,8 +258,8 @@ describe('Settings page', () => {
 
   describe('editing does not affect the producer', () => {
     it.each([
-      ['valid', { instruments: '20', updatesPerBatch: '1000', batchIntervalMs: '50' }],
-      ['invalid', { instruments: '', updatesPerBatch: '12.5', batchIntervalMs: '2001' }],
+      ['valid', { instrumentCount: '20', updatesPerBatch: '1000', batchIntervalMs: '50' }],
+      ['invalid', { instrumentCount: '', updatesPerBatch: '12.5', batchIntervalMs: '2001' }],
     ])('%s edits send nothing and keep the active run', async (_, values) => {
       const { type, producer, worker, sent } = setup();
       worker().emit({ type: 'status', status: 'running' });
@@ -275,7 +275,7 @@ describe('Settings page', () => {
 
     it('Reset to defaults sends nothing either', async () => {
       const { type, reset, sent, fixture } = setup();
-      await type('instruments', '20');
+      await type('instrumentCount', '20');
       reset().click();
       await fixture.whenStable();
       expect(sent()).toEqual([]);
@@ -283,7 +283,7 @@ describe('Settings page', () => {
   });
 
   describe('Apply sends the new settings', () => {
-    const edited = { instruments: 20, updatesPerBatch: 1000, batchIntervalMs: 50 };
+    const edited = { instrumentCount: 20, updatesPerBatch: 1000, batchIntervalMs: 50 };
 
     async function editAll(type: (key: string, value: string) => Promise<void>) {
       for (const [key, value] of Object.entries(edited)) {
@@ -358,13 +358,13 @@ describe('Settings page', () => {
 
     it('asks to fix the fields while one is invalid', async () => {
       const { el, type } = setup();
-      await type('instruments', '0');
+      await type('instrumentCount', '0');
       expect(tooltip(el)).toBe('Fix the highlighted fields to apply.');
     });
 
     it('says what Apply will do once there is something to apply', async () => {
       const { el, type } = setup();
-      await type('instruments', '20');
+      await type('instrumentCount', '20');
       expect(tooltip(el)).toBe(
         'Restarts the producer with these settings. All totals reset to zero.',
       );
@@ -384,7 +384,7 @@ describe('Settings page', () => {
     /** Fake timers hold back `whenStable`, so render directly. */
     function startApplying() {
       const page = setup();
-      const field = page.input('instruments');
+      const field = page.input('instrumentCount');
       field.value = '20';
       field.dispatchEvent(new Event('input'));
       page.fixture.detectChanges();
@@ -418,7 +418,7 @@ describe('Settings page', () => {
 
     it('keeps keyboard focus on Apply and locks Reset', () => {
       const page = setup();
-      const field = page.input('instruments');
+      const field = page.input('instrumentCount');
       field.value = '20';
       field.dispatchEvent(new Event('input'));
       page.fixture.detectChanges();

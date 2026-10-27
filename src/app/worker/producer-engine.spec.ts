@@ -7,13 +7,13 @@ import { FakeTime } from './testing/fake-time';
 /** Generator stub: valid updates spread over instruments, trade quantity 1. */
 class FakeGenerator implements BatchGenerator {
   readonly requested: number[] = [];
-  constructor(private readonly instruments: number) {}
+  constructor(private readonly instrumentCount: number) {}
 
   generateBatch(n: number): Int32Array {
     this.requested.push(n);
     const out = new Int32Array(n * MARKET_UPDATE_STRIDE);
     for (let i = 0; i < n; i++) {
-      out.set([i % this.instruments, 100, 101, 10, 10, 101, 1], i * MARKET_UPDATE_STRIDE);
+      out.set([i % this.instrumentCount, 100, 101, 10, 10, 101, 1], i * MARKET_UPDATE_STRIDE);
     }
     return out;
   }
@@ -22,16 +22,16 @@ class FakeGenerator implements BatchGenerator {
 function setup() {
   const time = new FakeTime();
   const events: WorkerEvent[] = [];
-  const generators: { seed: number; instruments: number; generator: FakeGenerator }[] = [];
+  const generators: { seed: number; instrumentCount: number; generator: FakeGenerator }[] = [];
   let failNextGenerator = false;
   const engine = new ProducerEngine({
-    createGenerator: (seed, instruments) => {
+    createGenerator: (seed, instrumentCount) => {
       if (failNextGenerator) {
         failNextGenerator = false;
         throw new Error('bad settings');
       }
-      const generator = new FakeGenerator(instruments);
-      generators.push({ seed, instruments, generator });
+      const generator = new FakeGenerator(instrumentCount);
+      generators.push({ seed, instrumentCount, generator });
       return generator;
     },
     scheduler: time,
@@ -45,7 +45,7 @@ function setup() {
 }
 
 /** 10 updates every 100 ms: a nominal 100 updates / second. */
-const settings = { seed: 7, instruments: 3, updatesPerBatch: 10, batchIntervalMs: 100 };
+const settings = { seed: 7, instrumentCount: 3, updatesPerBatch: 10, batchIntervalMs: 100 };
 
 /** Sum of traded volume across instruments in a snapshot. */
 const volumeOf = (s: Extract<WorkerEvent, { type: 'snapshot' }>) =>
@@ -63,7 +63,7 @@ describe('ProducerEngine', () => {
       const { engine, generators, statuses, time } = setup();
       engine.start(1, settings);
       expect(generators).toHaveLength(1);
-      expect(generators[0]).toMatchObject({ seed: 7, instruments: 3 });
+      expect(generators[0]).toMatchObject({ seed: 7, instrumentCount: 3 });
       expect(engine.status).toBe('running');
       expect(statuses()).toEqual(['running']);
       expect(time.activeTimers).toBe(2); // batches + snapshots
@@ -88,8 +88,8 @@ describe('ProducerEngine', () => {
 
     it('normalizes settings before using them', () => {
       const { engine, generators } = setup();
-      engine.start(1, { instruments: 0 });
-      expect(generators[0].instruments).toBe(1);
+      engine.start(1, { instrumentCount: 0 });
+      expect(generators[0].instrumentCount).toBe(1);
     });
 
     it('leaves the current run untouched if the new generator cannot be created', () => {

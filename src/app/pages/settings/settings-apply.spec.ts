@@ -9,7 +9,7 @@ import {
 import { Notifications } from '../../ui/toast/notifications';
 import { JUST_APPLIED_MS, MIN_APPLYING_MS, SettingsApply } from './settings-apply';
 
-const edited = { ...DEFAULT_PRODUCER_SETTINGS, instruments: 20, updatesPerBatch: 1000 };
+const edited = { ...DEFAULT_PRODUCER_SETTINGS, instrumentCount: 20, updatesPerBatch: 1000 };
 
 function setup() {
   const workers: FakeProducerWorker[] = [];
@@ -139,7 +139,7 @@ describe('SettingsApply', () => {
   it('ignores Apply while a run is still starting', () => {
     const { service, worker } = setup();
     service.apply(edited);
-    service.apply({ ...edited, instruments: 7 });
+    service.apply({ ...edited, instrumentCount: 7 });
     expect(worker().sent.slice(2)).toEqual([
       { type: 'init', settings: edited },
       { type: 'start', runId: 2 },

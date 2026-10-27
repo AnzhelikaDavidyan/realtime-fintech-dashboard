@@ -8,7 +8,7 @@ export interface BatchGenerator {
   generateBatch(n: number): Int32Array;
 }
 
-export type GeneratorFactory = (seed: number, instruments: number) => BatchGenerator;
+export type GeneratorFactory = (seed: number, instrumentCount: number) => BatchGenerator;
 
 /** Repeating timer; returns a function that cancels it. */
 export interface Scheduler {
@@ -65,13 +65,13 @@ export class ProducerEngine {
    */
   start(runId: number, settings: Partial<ProducerSettings>): void {
     const next = normalizeProducerSettings(settings);
-    const generator = this.deps.createGenerator(next.seed, next.instruments);
+    const generator = this.deps.createGenerator(next.seed, next.instrumentCount);
 
     this.stopTimers();
     this.runId = runId;
     this.settings = next;
     this.generator = generator;
-    this.metrics = new MetricsAggregator(next.instruments);
+    this.metrics = new MetricsAggregator(next.instrumentCount);
     this.generated = 0;
     this.changed = false;
     this.startTimers();

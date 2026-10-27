@@ -21,19 +21,19 @@ export class MetricsAggregator {
   private readonly volume: Float64Array;
   private readonly notional: Float64Array;
 
-  constructor(readonly instruments: number) {
-    if (!Number.isInteger(instruments) || instruments < 1) {
-      throw new RangeError(`instruments must be a positive integer, got ${instruments}`);
+  constructor(readonly instrumentCount: number) {
+    if (!Number.isInteger(instrumentCount) || instrumentCount < 1) {
+      throw new RangeError(`instrumentCount must be a positive integer, got ${instrumentCount}`);
     }
-    this.hasBidAsk = new Uint8Array(instruments);
-    this.bid = new Int32Array(instruments);
-    this.ask = new Int32Array(instruments);
-    this.bidQty = new Int32Array(instruments);
-    this.askQty = new Int32Array(instruments);
-    this.hasTrade = new Uint8Array(instruments);
-    this.lastPrice = new Int32Array(instruments);
-    this.volume = new Float64Array(instruments);
-    this.notional = new Float64Array(instruments);
+    this.hasBidAsk = new Uint8Array(instrumentCount);
+    this.bid = new Int32Array(instrumentCount);
+    this.ask = new Int32Array(instrumentCount);
+    this.bidQty = new Int32Array(instrumentCount);
+    this.askQty = new Int32Array(instrumentCount);
+    this.hasTrade = new Uint8Array(instrumentCount);
+    this.lastPrice = new Int32Array(instrumentCount);
+    this.volume = new Float64Array(instrumentCount);
+    this.notional = new Float64Array(instrumentCount);
   }
 
   /** Folds a producer batch (n × 7 integers) into the accumulators. */
@@ -89,7 +89,7 @@ export class MetricsAggregator {
 
   /** Current metrics for every instrument, ordered by instrument id. */
   snapshot(): InstrumentMetrics[] {
-    return Array.from({ length: this.instruments }, (_, i) => this.metrics(i));
+    return Array.from({ length: this.instrumentCount }, (_, i) => this.metrics(i));
   }
 
   /** Clears all accumulators. */
@@ -110,8 +110,8 @@ export class MetricsAggregator {
   }
 
   private assertInstrument(id: number): void {
-    if (!Number.isInteger(id) || id < 0 || id >= this.instruments) {
-      throw new RangeError(`instrument ${id} is outside 0..${this.instruments - 1}`);
+    if (!Number.isInteger(id) || id < 0 || id >= this.instrumentCount) {
+      throw new RangeError(`instrument ${id} is outside 0..${this.instrumentCount - 1}`);
     }
   }
 }

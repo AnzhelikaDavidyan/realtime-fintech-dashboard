@@ -101,7 +101,7 @@ describe('Dashboard', () => {
   describe('running', () => {
     it('fills the table with formatted values and hides the banner', async () => {
       const { producer, emit, snapshot, banner, bodyRows, cells, stat } = setup();
-      producer.apply({ instruments: 2 });
+      producer.apply({ instrumentCount: 2 });
       await emit(
         { type: 'status', status: 'running' },
         snapshot([metrics(0), metrics(1, { imbalance: -0.35, lastPrice: 4_831 })]),
@@ -122,7 +122,7 @@ describe('Dashboard', () => {
 
     it('colours imbalance and draws its bar', async () => {
       const { producer, emit, snapshot, el } = setup();
-      producer.apply({ instruments: 2 });
+      producer.apply({ instrumentCount: 2 });
       await emit(
         { type: 'status', status: 'running' },
         snapshot([metrics(0, { imbalance: 0.2 }), metrics(1, { imbalance: -0.35 })]),
@@ -135,7 +135,7 @@ describe('Dashboard', () => {
 
     it('shows ▲ when a price rises and ▼ when it falls', async () => {
       const { producer, emit, snapshot, el } = setup();
-      producer.apply({ instruments: 2 });
+      producer.apply({ instrumentCount: 2 });
       await emit(
         { type: 'status', status: 'running' },
         snapshot([metrics(0, { lastPrice: 100 }), metrics(1, { lastPrice: 100 })]),
@@ -150,7 +150,7 @@ describe('Dashboard', () => {
 
     it('keeps each symbol in the same row element while values update', async () => {
       const { producer, emit, snapshot, bodyRows } = setup();
-      producer.apply({ instruments: 2 });
+      producer.apply({ instrumentCount: 2 });
       await emit({ type: 'status', status: 'running' }, snapshot([metrics(0), metrics(1)]));
       const before = bodyRows();
       await emit(snapshot([metrics(0, { volume: 1 }), metrics(1, { volume: 2 })]));
@@ -161,7 +161,7 @@ describe('Dashboard', () => {
   describe('paused', () => {
     it('shows the paused banner and keeps the values', async () => {
       const { producer, emit, snapshot, banner, bodyRows, cells, text } = setup();
-      producer.apply({ instruments: 1 });
+      producer.apply({ instrumentCount: 1 });
       await emit({ type: 'status', status: 'running' }, snapshot([metrics(0)]));
       await emit({ type: 'status', status: 'paused' });
 
@@ -207,7 +207,7 @@ describe('Dashboard', () => {
 
   it('shows one row per instrument of the active settings, named by symbol', async () => {
     const { producer, fixture, bodyRows, text } = setup();
-    producer.apply({ instruments: 3 });
+    producer.apply({ instrumentCount: 3 });
     await fixture.whenStable();
     expect(bodyRows().map((r) => text(r.querySelector('th')))).toEqual(['ALFA', 'BETA', 'GAMA']);
   });

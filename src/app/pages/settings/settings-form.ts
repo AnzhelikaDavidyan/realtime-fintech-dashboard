@@ -4,10 +4,10 @@ import { PRODUCER_SETTINGS_LIMITS, ProducerSettings } from '../../core/producer-
 import { formatVolume } from '../../ui/format/formatters';
 
 /** The settings a person can edit (the seed stays as it is). */
-export type EditableKey = 'instruments' | 'updatesPerBatch' | 'batchIntervalMs';
+export type EditableKey = 'instrumentCount' | 'updatesPerBatch' | 'batchIntervalMs';
 
 export const EDITABLE_KEYS: readonly EditableKey[] = [
-  'instruments',
+  'instrumentCount',
   'updatesPerBatch',
   'batchIntervalMs',
 ];
@@ -62,8 +62,8 @@ export function matchesSettings(value: SettingsFormValue, settings: ProducerSett
 
 /** "Run #3 · 5 instruments · 100 updates every 500 ms". */
 export function describeRun(runId: number, settings: ProducerSettings, locale?: string): string {
-  const { instruments, updatesPerBatch, batchIntervalMs } = settings;
+  const { instrumentCount, updatesPerBatch, batchIntervalMs } = settings;
   const n = (value: number) => formatVolume(value, { locale });
-  const noun = instruments === 1 ? 'instrument' : 'instruments';
-  return `Run #${runId} · ${n(instruments)} ${noun} · ${n(updatesPerBatch)} updates every ${n(batchIntervalMs)} ms`;
+  const noun = instrumentCount === 1 ? 'instrument' : 'instruments';
+  return `Run #${runId} · ${n(instrumentCount)} ${noun} · ${n(updatesPerBatch)} updates every ${n(batchIntervalMs)} ms`;
 }

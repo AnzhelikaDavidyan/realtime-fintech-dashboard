@@ -12,8 +12,8 @@ const ASK_QTY: usize = 4;
 const TRADE_PRICE: usize = 5;
 const TRADE_QTY: usize = 6;
 
-fn generator(seed: u64, instruments: u32) -> MarketGenerator {
-    MarketGenerator::try_new(seed, instruments).expect("valid generator")
+fn generator(seed: u64, instrument_count: u32) -> MarketGenerator {
+    MarketGenerator::try_new(seed, instrument_count).expect("valid generator")
 }
 
 fn split(batch: &[i32]) -> Vec<Update> {
@@ -40,13 +40,13 @@ fn batch_length_matches_requested_size() {
 
 #[test]
 fn invariants_hold_over_100k_updates() {
-    let instruments = 16;
-    let updates = split(&generator(2024, instruments).generate_batch(100_000));
+    let instrument_count = 16;
+    let updates = split(&generator(2024, instrument_count).generate_batch(100_000));
     assert_eq!(updates.len(), 100_000);
 
     for (i, u) in updates.iter().enumerate() {
         assert!(
-            (0..instruments as i32).contains(&u[INSTRUMENT]),
+            (0..instrument_count as i32).contains(&u[INSTRUMENT]),
             "#{i}: instrument {}",
             u[INSTRUMENT]
         );
@@ -87,9 +87,9 @@ fn different_seeds_give_different_output() {
 
 #[test]
 fn prices_evolve_from_the_previous_value() {
-    let instruments = 4;
-    let updates = split(&generator(7, instruments).generate_batch(100_000));
-    let mut last = vec![None; instruments as usize];
+    let instrument_count = 4;
+    let updates = split(&generator(7, instrument_count).generate_batch(100_000));
+    let mut last = vec![None; instrument_count as usize];
     let mut moved = 0;
 
     for u in &updates {

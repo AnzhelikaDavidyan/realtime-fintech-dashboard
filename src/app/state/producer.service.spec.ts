@@ -65,7 +65,7 @@ describe('ProducerService', () => {
     it('increments the run id every time and starts that run', () => {
       const { service, sentSinceStartup } = setup();
       for (const expected of [2, 3, 4]) {
-        service.apply({ instruments: expected });
+        service.apply({ instrumentCount: expected });
         expect(service.runId()).toBe(expected);
       }
       const starts = sentSinceStartup().filter((c) => c.type === 'start');
@@ -81,7 +81,7 @@ describe('ProducerService', () => {
       worker().emit(snapshot(1, [row(0, 5), row(1, 7)]));
       expect(service.rows()).toHaveLength(2);
 
-      service.apply({ instruments: 3 });
+      service.apply({ instrumentCount: 3 });
       expect(service.rows()).toEqual([]);
     });
 
@@ -91,12 +91,12 @@ describe('ProducerService', () => {
       service.pause();
       worker().emit({ type: 'status', status: 'paused' });
 
-      service.apply({ instruments: 2 });
+      service.apply({ instrumentCount: 2 });
 
       // A fresh `start`, not a `resume`: the new run runs whatever state the old one was in.
       expect(sentSinceStartup()).toEqual([
         { type: 'pause' },
-        { type: 'init', settings: { ...DEFAULT_PRODUCER_SETTINGS, instruments: 2 } },
+        { type: 'init', settings: { ...DEFAULT_PRODUCER_SETTINGS, instrumentCount: 2 } },
         { type: 'start', runId: 2 },
       ]);
 
@@ -108,9 +108,9 @@ describe('ProducerService', () => {
 
     it('normalizes the settings it starts with', () => {
       const { service, sentSinceStartup } = setup();
-      service.apply({ instruments: 3.4, updatesPerBatch: 1e9 });
+      service.apply({ instrumentCount: 3.4, updatesPerBatch: 1e9 });
 
-      const settings = { ...DEFAULT_PRODUCER_SETTINGS, instruments: 3, updatesPerBatch: 1_000 };
+      const settings = { ...DEFAULT_PRODUCER_SETTINGS, instrumentCount: 3, updatesPerBatch: 1_000 };
       expect(service.activeSettings()).toEqual(settings);
       expect(sentSinceStartup()[0]).toEqual({ type: 'init', settings });
     });
@@ -123,7 +123,7 @@ describe('ProducerService', () => {
       worker().emit({ ...snapshot(1, [row(0, 5)]), totalUpdates: 1_200 } as WorkerEvent);
       expect(service.totalUpdates()).toBe(1_200);
 
-      service.apply({ instruments: 1 });
+      service.apply({ instrumentCount: 1 });
       expect(service.totalUpdates()).toBe(0);
 
       worker().emit({ ...snapshot(1, [row(0, 5)]), totalUpdates: 9_999 } as WorkerEvent);
@@ -162,7 +162,7 @@ describe('ProducerService', () => {
   describe('stale runs', () => {
     it('ignores late snapshots from the previous run', () => {
       const { service, worker } = setup();
-      service.apply({ instruments: 2 });
+      service.apply({ instrumentCount: 2 });
 
       worker().emit(snapshot(1, [row(0, 999)]));
       expect(service.rows()).toEqual([]);
@@ -173,9 +173,9 @@ describe('ProducerService', () => {
 
     it('accepts only the latest run after several switches', () => {
       const { service, worker } = setup();
-      service.apply({ instruments: 1 });
-      service.apply({ instruments: 1 });
-      service.apply({ instruments: 1 });
+      service.apply({ instrumentCount: 1 });
+      service.apply({ instrumentCount: 1 });
+      service.apply({ instrumentCount: 1 });
 
       for (const runId of [1, 2, 3, 99]) {
         worker().emit(snapshot(runId, [row(0, runId)]));
@@ -188,7 +188,7 @@ describe('ProducerService', () => {
 
     it('does not let a stale snapshot overwrite fresh rows', () => {
       const { service, worker } = setup();
-      service.apply({ instruments: 1 });
+      service.apply({ instrumentCount: 1 });
       worker().emit(snapshot(2, [row(0, 20)]));
       worker().emit(snapshot(1, [row(0, 10)]));
       expect(service.rows()).toEqual([row(0, 20)]);
@@ -240,7 +240,7 @@ describe('ProducerService', () => {
     it('clears an old error when a new run starts', () => {
       const { service, worker } = setup();
       worker().emit({ type: 'error', message: 'bad settings', command: 'start' });
-      service.apply({ instruments: 2 });
+      service.apply({ instrumentCount: 2 });
       expect(service.error()).toBeNull();
     });
   });
@@ -248,7 +248,7 @@ describe('ProducerService', () => {
   describe('retry', () => {
     it('replaces the worker and restarts with the active settings', () => {
       const { service, workers } = setup();
-      service.apply({ instruments: 4 });
+      service.apply({ instrumentCount: 4 });
       workers[0].emit({ type: 'error', message: 'boom' });
 
       service.retry();
@@ -256,7 +256,7 @@ describe('ProducerService', () => {
       expect(workers).toHaveLength(2);
       expect(workers[0].terminated).toBe(true);
       expect(workers[1].sent).toEqual([
-        { type: 'init', settings: { ...DEFAULT_PRODUCER_SETTINGS, instruments: 4 } },
+        { type: 'init', settings: { ...DEFAULT_PRODUCER_SETTINGS, instrumentCount: 4 } },
         { type: 'start', runId: 3 },
       ]);
       expect(service.status()).toBe('starting');
@@ -295,7 +295,7 @@ describe('ProducerService', () => {
     it('goes back to pending for every new run', () => {
       const { service, worker } = setup();
       worker().emit({ type: 'status', status: 'running' });
-      service.apply({ instruments: 3 });
+      service.apply({ instrumentCount: 3 });
       expect(service.runOutcome()).toBe('pending');
     });
 

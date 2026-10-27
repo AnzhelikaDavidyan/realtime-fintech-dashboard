@@ -38,7 +38,7 @@ export async function loadProducerWasm(
   }
   return {
     version: version(),
-    createGenerator: (seed, instruments) => new MarketGenerator(BigInt(seed), instruments),
+    createGenerator: (seed, instrumentCount) => new MarketGenerator(BigInt(seed), instrumentCount),
   };
 }
 

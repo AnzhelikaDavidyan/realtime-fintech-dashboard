@@ -43,7 +43,9 @@ export class Dashboard {
 
   protected readonly runId = this.producer.runId;
   protected readonly totalUpdates = this.producer.totalUpdates;
-  protected readonly instruments = computed(() => this.producer.activeSettings().instruments);
+  protected readonly instrumentCount = computed(
+    () => this.producer.activeSettings().instrumentCount,
+  );
   protected readonly rate = computed(() => nominalRate(this.producer.activeSettings()));
 
   protected readonly view = computed<DashboardView>(() => {
@@ -74,7 +76,7 @@ export class Dashboard {
   protected readonly rows = computed<readonly MarketRow[]>(() => {
     const byId = new Map(this.producer.rows().map((m) => [m.instrument, m]));
     const trends = this.trends().trends;
-    return Array.from({ length: this.instruments() }, (_, i) => {
+    return Array.from({ length: this.instrumentCount() }, (_, i) => {
       const symbol = instrumentSymbol(i);
       return {
         symbol,

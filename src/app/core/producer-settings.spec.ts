@@ -9,14 +9,14 @@ import {
 describe('producer settings', () => {
   it('has the defaults from the design: 5 instruments, 100 updates every 500 ms', () => {
     expect(DEFAULT_PRODUCER_SETTINGS).toMatchObject({
-      instruments: 5,
+      instrumentCount: 5,
       updatesPerBatch: 100,
       batchIntervalMs: 500,
     });
   });
 
   it('has the limits from the design', () => {
-    expect(PRODUCER_SETTINGS_LIMITS.instruments).toEqual({ min: 1, max: 50 });
+    expect(PRODUCER_SETTINGS_LIMITS.instrumentCount).toEqual({ min: 1, max: 50 });
     expect(PRODUCER_SETTINGS_LIMITS.updatesPerBatch).toEqual({ min: 1, max: 1_000 });
     expect(PRODUCER_SETTINGS_LIMITS.batchIntervalMs).toEqual({ min: 50, max: 2_000 });
   });
@@ -46,20 +46,20 @@ describe('normalizeProducerSettings', () => {
   });
 
   it('keeps valid values and fills the rest with defaults', () => {
-    expect(normalizeProducerSettings({ seed: 7, instruments: 25 })).toEqual({
+    expect(normalizeProducerSettings({ seed: 7, instrumentCount: 25 })).toEqual({
       ...DEFAULT_PRODUCER_SETTINGS,
       seed: 7,
-      instruments: 25,
+      instrumentCount: 25,
     });
   });
 
   it('clamps values into their limits', () => {
-    const { instruments, updatesPerBatch, batchIntervalMs } = PRODUCER_SETTINGS_LIMITS;
+    const { instrumentCount, updatesPerBatch, batchIntervalMs } = PRODUCER_SETTINGS_LIMITS;
     expect(
-      normalizeProducerSettings({ instruments: 0, updatesPerBatch: 1e9, batchIntervalMs: 1 }),
+      normalizeProducerSettings({ instrumentCount: 0, updatesPerBatch: 1e9, batchIntervalMs: 1 }),
     ).toEqual({
       ...DEFAULT_PRODUCER_SETTINGS,
-      instruments: instruments.min,
+      instrumentCount: instrumentCount.min,
       updatesPerBatch: updatesPerBatch.max,
       batchIntervalMs: batchIntervalMs.min,
     });
@@ -67,15 +67,17 @@ describe('normalizeProducerSettings', () => {
   });
 
   it('rounds to whole numbers', () => {
-    expect(normalizeProducerSettings({ instruments: 3.6, updatesPerBatch: 99.4 })).toMatchObject({
-      instruments: 4,
+    expect(
+      normalizeProducerSettings({ instrumentCount: 3.6, updatesPerBatch: 99.4 }),
+    ).toMatchObject({
+      instrumentCount: 4,
       updatesPerBatch: 99,
     });
   });
 
   it('falls back to the default for non-finite values', () => {
     expect(
-      normalizeProducerSettings({ seed: Number.NaN, instruments: Number.POSITIVE_INFINITY }),
+      normalizeProducerSettings({ seed: Number.NaN, instrumentCount: Number.POSITIVE_INFINITY }),
     ).toEqual(DEFAULT_PRODUCER_SETTINGS);
   });
 });
