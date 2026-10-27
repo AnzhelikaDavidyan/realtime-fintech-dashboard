@@ -32,7 +32,10 @@ function setup() {
   const workers: FakeProducerWorker[] = [];
   TestBed.configureTestingModule({ providers: [provideFakeProducerWorker(workers)] });
   const service = TestBed.inject(ProducerService);
-  return { service, workers, worker: () => workers.at(-1)! };
+  const worker = () => workers.at(-1)!;
+  /** Commands sent after the initial default run (init + start). */
+  const sentSinceStartup = () => worker().sent.slice(2);
+  return { service, workers, worker, sentSinceStartup };
 }
 
 describe('ProducerService', () => {
@@ -58,25 +61,92 @@ describe('ProducerService', () => {
     });
   });
 
-  describe('worker events', () => {
-    it('follows the worker status', () => {
-      const { service, worker } = setup();
-      worker().emit({ type: 'ready', producerVersion: '0.1.0' });
-      worker().emit({ type: 'status', status: 'running' });
-      expect(service.status()).toBe('running');
-      worker().emit({ type: 'status', status: 'paused' });
-      expect(service.status()).toBe('paused');
+  describe('apply', () => {
+    it('increments the run id every time and starts that run', () => {
+      const { service, sentSinceStartup } = setup();
+      for (const expected of [2, 3, 4]) {
+        service.apply({ instruments: expected });
+        expect(service.runId()).toBe(expected);
+      }
+      const starts = sentSinceStartup().filter((c) => c.type === 'start');
+      expect(starts).toEqual([
+        { type: 'start', runId: 2 },
+        { type: 'start', runId: 3 },
+        { type: 'start', runId: 4 },
+      ]);
     });
 
-    it('decodes snapshots of the current run into rows', () => {
+    it('clears the rows immediately, before the new run reports anything', () => {
       const { service, worker } = setup();
       worker().emit(snapshot(1, [row(0, 5), row(1, 7)]));
-      expect(service.rows()).toEqual([row(0, 5), row(1, 7)]);
+      expect(service.rows()).toHaveLength(2);
+
+      service.apply({ instruments: 3 });
+      expect(service.rows()).toEqual([]);
     });
 
-    it('ignores snapshots from an old run', () => {
+    it('starts generation even when the producer is paused', () => {
+      const { service, worker, sentSinceStartup } = setup();
+      worker().emit({ type: 'status', status: 'running' });
+      service.pause();
+      worker().emit({ type: 'status', status: 'paused' });
+
+      service.apply({ instruments: 2 });
+
+      // A fresh `start`, not a `resume`: the new run runs whatever state the old one was in.
+      expect(sentSinceStartup()).toEqual([
+        { type: 'pause' },
+        { type: 'init', settings: { ...DEFAULT_PRODUCER_SETTINGS, instruments: 2 } },
+        { type: 'start', runId: 2 },
+      ]);
+
+      worker().emit({ type: 'status', status: 'running' });
+      worker().emit(snapshot(2, [row(0, 1), row(1, 1)]));
+      expect(service.status()).toBe('running');
+      expect(service.rows()).toHaveLength(2);
+    });
+
+    it('normalizes the settings it starts with', () => {
+      const { service, sentSinceStartup } = setup();
+      service.apply({ instruments: 3.4, updatesPerSecond: 1e9 });
+
+      const settings = { ...DEFAULT_PRODUCER_SETTINGS, instruments: 3, updatesPerSecond: 100_000 };
+      expect(service.activeSettings()).toEqual(settings);
+      expect(sentSinceStartup()[0]).toEqual({ type: 'init', settings });
+    });
+  });
+
+  describe('pause and resume', () => {
+    it('sends pause and resume and follows the status the worker reports', () => {
+      const { service, worker, sentSinceStartup } = setup();
+      worker().emit({ type: 'status', status: 'running' });
+
+      service.pause();
+      worker().emit({ type: 'status', status: 'paused' });
+      expect(service.status()).toBe('paused');
+
+      service.resume();
+      worker().emit({ type: 'status', status: 'running' });
+      expect(service.status()).toBe('running');
+
+      expect(sentSinceStartup()).toEqual([{ type: 'pause' }, { type: 'resume' }]);
+    });
+
+    it('keeps the run and its rows while paused', () => {
       const { service, worker } = setup();
       worker().emit(snapshot(1, [row(0, 5)]));
+      service.pause();
+      worker().emit({ type: 'status', status: 'paused' });
+      service.resume();
+
+      expect(service.runId()).toBe(1);
+      expect(service.rows()).toEqual([row(0, 5)]);
+    });
+  });
+
+  describe('stale runs', () => {
+    it('ignores late snapshots from the previous run', () => {
+      const { service, worker } = setup();
       service.apply({ instruments: 2 });
 
       worker().emit(snapshot(1, [row(0, 999)]));
@@ -86,14 +156,39 @@ describe('ProducerService', () => {
       expect(service.rows()).toEqual([row(0, 1), row(1, 2)]);
     });
 
-    it('marks the producer unusable when the worker fails to load', () => {
+    it('accepts only the latest run after several switches', () => {
+      const { service, worker } = setup();
+      service.apply({ instruments: 1 });
+      service.apply({ instruments: 1 });
+      service.apply({ instruments: 1 });
+
+      for (const runId of [1, 2, 3, 99]) {
+        worker().emit(snapshot(runId, [row(0, runId)]));
+      }
+      expect(service.rows()).toEqual([]);
+
+      worker().emit(snapshot(4, [row(0, 4)]));
+      expect(service.rows()).toEqual([row(0, 4)]);
+    });
+
+    it('does not let a stale snapshot overwrite fresh rows', () => {
+      const { service, worker } = setup();
+      service.apply({ instruments: 1 });
+      worker().emit(snapshot(2, [row(0, 20)]));
+      worker().emit(snapshot(1, [row(0, 10)]));
+      expect(service.rows()).toEqual([row(0, 20)]);
+    });
+  });
+
+  describe('errors', () => {
+    it('shows a load failure and marks the producer unusable', () => {
       const { service, worker } = setup();
       worker().emit({ type: 'error', message: 'Could not download the market engine' });
       expect(service.status()).toBe('error');
       expect(service.error()).toBe('Could not download the market engine');
     });
 
-    it('reports a failed command without changing the status', () => {
+    it('shows a failed command without changing the status', () => {
       const { service, worker } = setup();
       worker().emit({ type: 'status', status: 'running' });
       worker().emit({ type: 'error', message: 'bad settings', command: 'start' });
@@ -101,43 +196,27 @@ describe('ProducerService', () => {
       expect(service.error()).toBe('bad settings');
     });
 
-    it('reports a crashed worker script', () => {
+    it('keeps showing why a run ended', () => {
+      const { service, worker } = setup();
+      worker().emit({ type: 'error', message: 'wasm trapped' });
+      worker().emit({ type: 'status', status: 'finished' });
+      expect(service.status()).toBe('finished');
+      expect(service.error()).toBe('wasm trapped');
+    });
+
+    it('shows a crashed worker script', () => {
       const { service, worker } = setup();
       worker().crash('Unexpected token');
       expect(service.status()).toBe('error');
       expect(service.error()).toBe('Unexpected token');
     });
-  });
 
-  describe('commands', () => {
-    it('sends pause and resume to the worker', () => {
+    it('clears an old error when a new run starts', () => {
       const { service, worker } = setup();
-      service.pause();
-      service.resume();
-      expect(worker().sent.slice(2)).toEqual([{ type: 'pause' }, { type: 'resume' }]);
+      worker().emit({ type: 'error', message: 'bad settings', command: 'start' });
+      service.apply({ instruments: 2 });
+      expect(service.error()).toBeNull();
     });
-
-    it('apply starts a new run with normalized settings', () => {
-      const { service, worker } = setup();
-      worker().emit(snapshot(1, [row(0, 5)]));
-      service.apply({ instruments: 3.4, updatesPerSecond: 1e9 });
-
-      const settings = { ...DEFAULT_PRODUCER_SETTINGS, instruments: 3, updatesPerSecond: 100_000 };
-      expect(service.activeSettings()).toEqual(settings);
-      expect(service.runId()).toBe(2);
-      expect(service.rows()).toEqual([]);
-      expect(worker().sent.slice(2)).toEqual([
-        { type: 'init', settings },
-        { type: 'start', runId: 2 },
-      ]);
-    });
-  });
-
-  it('clears an old error when a new run starts', () => {
-    const { service, worker } = setup();
-    worker().emit({ type: 'error', message: 'bad settings', command: 'start' });
-    service.apply({ instruments: 2 });
-    expect(service.error()).toBeNull();
   });
 
   describe('retry', () => {
