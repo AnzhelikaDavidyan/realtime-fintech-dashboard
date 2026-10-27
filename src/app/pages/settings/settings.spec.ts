@@ -6,7 +6,9 @@ import {
   FakeProducerWorker,
   provideFakeProducerWorker,
 } from '../../state/testing/fake-producer-worker';
+import { Notifications } from '../../ui/toast/notifications';
 import { Settings } from './settings';
+import { MIN_APPLYING_MS } from './settings-apply';
 import { EDITABLE_KEYS } from './settings-form';
 
 const RANGE_MESSAGES = {
@@ -40,6 +42,8 @@ function setup() {
   const error = (key: string) => text(el.querySelector(`#setting-${key}-error`));
   const apply = () => el.querySelector('button[type="submit"]') as HTMLButtonElement;
   const reset = () => el.querySelector('button[type="button"]') as HTMLButtonElement;
+  /** Apply stays focusable for its tooltip, so "disabled" is `aria-disabled`. */
+  const applyDisabled = () => apply().getAttribute('aria-disabled') === 'true';
 
   /** Types a value as a person would: input, then leave the field. */
   async function type(key: string, value: string) {
@@ -52,7 +56,22 @@ function setup() {
   const worker = () => workers.at(-1)!;
   /** Commands sent after the default run started (init + start). */
   const sent = () => worker().sent.slice(2);
-  return { fixture, el, producer, text, input, wrapper, error, apply, reset, type, worker, sent };
+  return {
+    fixture,
+    el,
+    producer,
+    text,
+    input,
+    wrapper,
+    error,
+    apply,
+    applyDisabled,
+    reset,
+    type,
+    worker,
+    workers,
+    sent,
+  };
 }
 
 describe('Settings page', () => {
@@ -77,8 +96,8 @@ describe('Settings page', () => {
     });
 
     it('disables Apply while the form matches the active run', () => {
-      const { apply, el, text } = setup();
-      expect(apply().disabled).toBe(true);
+      const { el, text, applyDisabled } = setup();
+      expect(applyDisabled()).toBe(true);
       expect(text(el.querySelector('.actions__note'))).toBe(
         'Form matches the active run — nothing to apply yet.',
       );
@@ -94,7 +113,7 @@ describe('Settings page', () => {
 
   describe('editing', () => {
     it('marks changed fields, updates the rate and enables Apply', async () => {
-      const { type, wrapper, apply, el, text } = setup();
+      const { type, wrapper, el, text, applyDisabled } = setup();
       await type('instruments', '20');
       await type('updatesPerBatch', '1000');
       await type('batchIntervalMs', '50');
@@ -102,17 +121,17 @@ describe('Settings page', () => {
       expect(wrapper('instruments').classList).toContain('input--changed');
       expect(text(el.querySelector('.rate'))).toContain('20,000 updates / second');
       expect(text(el.querySelector('.rate'))).toContain('(1000 × 1000 / 50)');
-      expect(apply().disabled).toBe(false);
+      expect(applyDisabled()).toBe(false);
       expect(text(el.querySelector('.actions__note'))).toBe(
         'Apply resets all totals and starts a new run (it also resumes if paused).',
       );
     });
 
     it('goes back to "nothing to apply" when the original value is typed again', async () => {
-      const { type, apply, wrapper } = setup();
+      const { type, wrapper, applyDisabled } = setup();
       await type('instruments', '6');
       await type('instruments', '5');
-      expect(apply().disabled).toBe(true);
+      expect(applyDisabled()).toBe(true);
       expect(wrapper('instruments').classList).not.toContain('input--changed');
     });
   });
@@ -129,9 +148,9 @@ describe('Settings page', () => {
     });
 
     it('disables Apply, hides the rate and explains why', async () => {
-      const { type, apply, el, text } = setup();
+      const { type, el, text, applyDisabled } = setup();
       await type('instruments', '0');
-      expect(apply().disabled).toBe(true);
+      expect(applyDisabled()).toBe(true);
       expect(text(el.querySelector('.rate'))).toBe(
         'Nominal rate: — (fix the errors to see the rate)',
       );
@@ -148,12 +167,12 @@ describe('Settings page', () => {
 
   describe('apply', () => {
     it('shows the form as matching the new run afterwards', async () => {
-      const { type, apply, el, text, fixture, wrapper } = setup();
+      const { type, apply, el, text, fixture, wrapper, applyDisabled } = setup();
       await type('instruments', '20');
       apply().click();
       await fixture.whenStable();
 
-      expect(apply().disabled).toBe(true);
+      expect(applyDisabled()).toBe(true);
       expect(wrapper('instruments').classList).not.toContain('input--changed');
       expect(text(el.querySelector('.help__item p'))).toBe(
         'Run #2 · 20 instruments · 100 updates every 500 ms',
@@ -188,7 +207,11 @@ describe('Settings page', () => {
       expect(field('updatesPerBatch').value).toBe('100');
       expect(field('batchIntervalMs').value).toBe('500');
       expect(producer.runId()).toBe(2);
-      expect((el.querySelector('button[type="submit"]') as HTMLButtonElement).disabled).toBe(false);
+      expect(
+        (el.querySelector('button[type="submit"]') as HTMLButtonElement).getAttribute(
+          'aria-disabled',
+        ),
+      ).toBe('false');
     });
 
     it('clears validation errors', async () => {
@@ -204,32 +227,32 @@ describe('Settings page', () => {
     it.each(INVALID_VALUES)(
       '$key: $kind ("$value") shows "$message" and disables Apply',
       async ({ key, value, message }) => {
-        const { type, error, input, apply } = setup();
+        const { type, error, input, applyDisabled } = setup();
         await type(key, value);
 
         expect(error(key)).toBe(message);
         expect(input(key).getAttribute('aria-invalid')).toBe('true');
-        expect(apply().disabled).toBe(true);
+        expect(applyDisabled()).toBe(true);
       },
     );
 
     it.each(EDITABLE_KEYS)('%s: both ends of the range are valid', async (key) => {
-      const { type, error, apply } = setup();
+      const { type, error, applyDisabled } = setup();
       const { min, max } = PRODUCER_SETTINGS_LIMITS[key];
       for (const value of [min, max]) {
         await type(key, `${value}`);
         expect(error(key)).toBe('');
-        expect(apply().disabled).toBe(false);
+        expect(applyDisabled()).toBe(false);
       }
     });
 
     it('keeps Apply disabled while any one field is invalid', async () => {
-      const { type, apply } = setup();
+      const { type, applyDisabled } = setup();
       await type('instruments', '20');
       await type('batchIntervalMs', '49');
-      expect(apply().disabled).toBe(true);
+      expect(applyDisabled()).toBe(true);
       await type('batchIntervalMs', '50');
-      expect(apply().disabled).toBe(false);
+      expect(applyDisabled()).toBe(false);
     });
   });
 
@@ -316,6 +339,102 @@ describe('Settings page', () => {
       apply().click();
       await fixture.whenStable();
       expect(sent()).toHaveLength(2);
+    });
+  });
+
+  describe('Apply button', () => {
+    const tooltip = (el: HTMLElement) => el.querySelector('#apply-tooltip')?.textContent?.trim();
+
+    it('is labelled Apply and described by its tooltip', () => {
+      const { apply } = setup();
+      expect(apply().textContent?.trim()).toBe('Apply');
+      expect(apply().getAttribute('aria-describedby')).toBe('apply-tooltip');
+    });
+
+    it('explains that there is nothing to apply yet', () => {
+      const { el } = setup();
+      expect(tooltip(el)).toBe('Nothing to apply yet. Change a value to enable Apply.');
+    });
+
+    it('asks to fix the fields while one is invalid', async () => {
+      const { el, type } = setup();
+      await type('instruments', '0');
+      expect(tooltip(el)).toBe('Fix the highlighted fields to apply.');
+    });
+
+    it('says what Apply will do once there is something to apply', async () => {
+      const { el, type } = setup();
+      await type('instruments', '20');
+      expect(tooltip(el)).toBe(
+        'Restarts the producer with these settings. All totals reset to zero.',
+      );
+    });
+
+    it('stays focusable while unavailable, so the tooltip can be reached by keyboard', () => {
+      const { apply } = setup();
+      expect(apply().disabled).toBe(false);
+      expect(apply().getAttribute('aria-disabled')).toBe('true');
+    });
+  });
+
+  describe('while applying', () => {
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    /** Fake timers hold back `whenStable`, so render directly. */
+    function startApplying() {
+      const page = setup();
+      const field = page.input('instruments');
+      field.value = '20';
+      field.dispatchEvent(new Event('input'));
+      page.fixture.detectChanges();
+      page.apply().click();
+      page.fixture.detectChanges();
+      return page;
+    }
+
+    const render = (fixture: { detectChanges(): void }, ms = 0) => {
+      TestBed.tick();
+      vi.advanceTimersByTime(ms);
+      fixture.detectChanges();
+    };
+
+    it('shows progress, locks the form and explains what is happening', () => {
+      const { el, apply, text } = startApplying();
+      const form = el.querySelector('form')!;
+
+      expect(el.querySelector('[role="progressbar"]')?.getAttribute('aria-label')).toBe(
+        'Applying settings',
+      );
+      expect(form.getAttribute('aria-busy')).toBe('true');
+      expect(el.querySelector('fieldset')!.disabled).toBe(true);
+      expect(text(apply())).toBe('Applying…');
+      expect(text(el.querySelector('.actions__note'))).toBe(
+        'Applying settings: starting a new run…',
+      );
+      expect(text(el.querySelector('#apply-tooltip'))).toBe('Starting the new run…');
+    });
+
+    it('stays until the worker confirms the new run', () => {
+      const { el, fixture } = startApplying();
+      render(fixture, 5_000);
+      expect(el.querySelector('[role="progressbar"]')).not.toBeNull();
+    });
+
+    it('ends with a toast and a highlighted active run', () => {
+      const { el, fixture, worker, apply, text } = startApplying();
+      worker().emit({ type: 'status', status: 'running' });
+      render(fixture, MIN_APPLYING_MS);
+
+      expect(el.querySelector('[role="progressbar"]')).toBeNull();
+      expect(el.querySelector('fieldset')!.disabled).toBe(false);
+      expect(text(apply())).toBe('Apply');
+      expect(el.querySelector('.help__item')!.classList).toContain('help__item--fresh');
+      expect(
+        TestBed.inject(Notifications)
+          .toasts()
+          .map((t) => t.title),
+      ).toEqual(['Settings applied']);
     });
   });
 });

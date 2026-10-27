@@ -7,7 +7,12 @@ import {
   normalizeProducerSettings,
   ProducerSettings,
 } from '../core/producer-settings';
-import { WorkerCommand, WorkerEvent, WorkerStatus } from '../core/worker-protocol';
+import {
+  WorkerCommand,
+  WorkerCommandType,
+  WorkerEvent,
+  WorkerStatus,
+} from '../core/worker-protocol';
 
 /** The part of `Worker` the service uses, so tests can pass a fake. */
 export interface ProducerWorker {
@@ -31,6 +36,13 @@ export const PRODUCER_WORKER_FACTORY = new InjectionToken<() => ProducerWorker>(
 export type ProducerStatus = WorkerStatus | 'starting' | 'error';
 
 /**
+ * Whether the current run has really started: `pending` until the worker
+ * confirms it is running, `failed` if the run could not start or stopped
+ * with an error.
+ */
+export type RunOutcome = 'pending' | 'started' | 'failed';
+
+/**
  * App-wide access to the market data producer.
  *
  * Creates the Web Worker once and starts a run with the default settings.
@@ -49,6 +61,7 @@ export class ProducerService {
   private readonly _runId = signal(0);
   private readonly _activeSettings = signal<ProducerSettings>(DEFAULT_PRODUCER_SETTINGS);
   private readonly _error = signal<string | null>(null);
+  private readonly _runOutcome = signal<RunOutcome>('pending');
 
   readonly status = this._status.asReadonly();
   /** Latest metrics for every instrument, from the current run only. */
@@ -59,6 +72,7 @@ export class ProducerService {
   readonly activeSettings = this._activeSettings.asReadonly();
   /** Last problem reported by the worker, or null. */
   readonly error = this._error.asReadonly();
+  readonly runOutcome = this._runOutcome.asReadonly();
 
   constructor() {
     this.replaceWorker();
@@ -92,6 +106,7 @@ export class ProducerService {
     this._rows.set([]);
     this._totalUpdates.set(0);
     this._error.set(null);
+    this._runOutcome.set('pending');
     this.send({ type: 'init', settings });
     this.send({ type: 'start', runId });
   }
@@ -124,6 +139,10 @@ export class ProducerService {
         break;
       case 'status':
         this._status.set(event.status);
+        // Every `start` answers with `running`, so the first one confirms the run.
+        if (event.status === 'running' && this._runOutcome() === 'pending') {
+          this._runOutcome.set('started');
+        }
         break;
       case 'snapshot':
         if (event.runId === this._runId()) {
@@ -140,6 +159,9 @@ export class ProducerService {
           // Once the worker is unusable, the first message says why; the errors
           // for commands that were waiting would only repeat it.
           this._error.set(event.message);
+          if (isRunCommand(event.command) && this._runOutcome() === 'pending') {
+            this._runOutcome.set('failed');
+          }
         }
         break;
     }
@@ -148,9 +170,15 @@ export class ProducerService {
   private fail(message: string): void {
     this._error.set(message);
     this._status.set('error');
+    this._runOutcome.set('failed');
   }
 
   private send(command: WorkerCommand): void {
     this.worker?.postMessage(command);
   }
+}
+
+/** Commands that set up and start a run; if one fails, the run never starts. */
+function isRunCommand(command: WorkerCommandType): boolean {
+  return command === 'init' || command === 'start';
 }

@@ -1,0 +1,35 @@
+:host {
+  position: relative;
+  display: inline-flex;
+}
+
+.tooltip {
+  position: absolute;
+  z-index: 1;
+  right: 0;
+  bottom: calc(100% + 8px);
+  width: max-content;
+  max-width: 240px;
+  padding: 8px 10px;
+  border: 1px solid var(--button-border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.4;
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 120ms;
+  pointer-events: none;
+}
+
+:host(:hover) .tooltip,
+:host(:focus-within) .tooltip {
+  visibility: visible;
+  opacity: 1;
+}
+
+:host .tooltip--dismissed {
+  visibility: hidden;
+  opacity: 0;
+}

@@ -37,13 +37,49 @@ p {
 }
 
 .form {
-  display: flex;
+  position: relative;
   flex: 0 1 620px;
+  min-width: 0;
+  padding: 26px;
+  overflow: hidden;
+  border-radius: 14px;
+}
+
+.form__fields {
+  display: flex;
   flex-direction: column;
   gap: 20px;
   min-width: 0;
-  padding: 26px;
-  border-radius: 14px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+/* Indeterminate bar along the top edge of the card while a run starts. */
+.progress {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: var(--info-soft);
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 40%;
+    background: var(--info);
+    animation: progress 1.1s ease-in-out infinite;
+  }
+}
+
+@keyframes progress {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(250%);
+  }
 }
 
 .field {
@@ -169,7 +205,7 @@ p {
   white-space: nowrap;
   cursor: pointer;
 
-  &:hover:not(:disabled) {
+  &:hover:not(:disabled, [aria-disabled='true']) {
     filter: brightness(1.15);
   }
 
@@ -179,9 +215,34 @@ p {
     color: var(--text-strong);
   }
 
-  &:disabled {
+  &:disabled,
+  &[aria-disabled='true'] {
     opacity: 0.4;
     cursor: not-allowed;
+  }
+
+  /* Still shown at full strength while applying: it says what is happening. */
+  &--busy:disabled {
+    opacity: 1;
+    cursor: progress;
+  }
+}
+
+.spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: 6px;
+  border: 2px solid currentcolor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  vertical-align: -1px;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 
@@ -209,6 +270,28 @@ p {
 
   p {
     color: var(--text-muted);
+  }
+
+  &--fresh {
+    animation: fresh 2s ease-out;
+  }
+}
+
+@keyframes fresh {
+  from {
+    border-color: var(--up-strong);
+    background: var(--success-soft);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progress::after,
+  .spinner {
+    animation-duration: 3s;
+  }
+
+  .help__item--fresh {
+    animation: none;
   }
 }
 

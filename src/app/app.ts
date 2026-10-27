@@ -2,6 +2,7 @@ import { Component } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 
 import { ProducerControls } from './layout/producer-controls/producer-controls';
+import { Toasts } from './ui/toast/toasts';
 
 interface NavItem {
   path: string;
@@ -10,7 +11,7 @@ interface NavItem {
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, ProducerControls],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, ProducerControls, Toasts],
   templateUrl: './app.html',
   styleUrl: './app.scss',
 })

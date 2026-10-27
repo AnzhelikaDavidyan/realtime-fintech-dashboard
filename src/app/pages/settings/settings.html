@@ -4,65 +4,94 @@
 </header>
 
 <div class="content">
-  <form class="card form" [formGroup]="form" (ngSubmit)="apply()" novalidate>
-    @for (field of fields; track field.key) {
-      <div class="field">
-        <label class="field__label" [for]="'setting-' + field.key">{{ field.label }}</label>
-        <p class="field__hint" [id]="'setting-' + field.key + '-hint'">{{ field.hint }}</p>
-        <div
-          class="input"
-          [class.input--changed]="changed()[field.key] && !errors()[field.key]"
-          [class.input--invalid]="!!errors()[field.key]"
-        >
-          <input
-            type="number"
-            inputmode="numeric"
-            step="1"
-            [id]="'setting-' + field.key"
-            [formControlName]="field.key"
-            [attr.aria-invalid]="!!errors()[field.key]"
-            [attr.aria-describedby]="
-              'setting-' +
-              field.key +
-              '-hint setting-' +
-              field.key +
-              '-range' +
-              (errors()[field.key] ? ' setting-' + field.key + '-error' : '')
-            "
-          />
-          <span class="input__range" [id]="'setting-' + field.key + '-range'">{{
-            field.range
-          }}</span>
-        </div>
-        @if (errors()[field.key]; as error) {
-          <p class="field__error" [id]="'setting-' + field.key + '-error'">{{ error }}</p>
-        }
-      </div>
+  <form
+    class="card form"
+    [formGroup]="form"
+    (ngSubmit)="apply()"
+    novalidate
+    [attr.aria-busy]="applying()"
+  >
+    @if (applying()) {
+      <div class="progress" role="progressbar" aria-label="Applying settings"></div>
     }
-
-    <p class="rate" aria-live="polite">
-      Nominal rate:
-      @if (rate(); as rate) {
-        <strong>{{ rate.perSecond }} updates / second</strong>
-        across all instruments ({{ rate.formula }})
-      } @else {
-        <strong>&mdash;</strong> (fix the errors to see the rate)
+    <!-- Locks every field and button while the new run starts, without touching form state. -->
+    <fieldset class="form__fields" [disabled]="applying()">
+      @for (field of fields; track field.key) {
+        <div class="field">
+          <label class="field__label" [for]="'setting-' + field.key">{{ field.label }}</label>
+          <p class="field__hint" [id]="'setting-' + field.key + '-hint'">{{ field.hint }}</p>
+          <div
+            class="input"
+            [class.input--changed]="changed()[field.key] && !errors()[field.key]"
+            [class.input--invalid]="!!errors()[field.key]"
+          >
+            <input
+              type="number"
+              inputmode="numeric"
+              step="1"
+              [id]="'setting-' + field.key"
+              [formControlName]="field.key"
+              [attr.aria-invalid]="!!errors()[field.key]"
+              [attr.aria-describedby]="
+                'setting-' +
+                field.key +
+                '-hint setting-' +
+                field.key +
+                '-range' +
+                (errors()[field.key] ? ' setting-' + field.key + '-error' : '')
+              "
+            />
+            <span class="input__range" [id]="'setting-' + field.key + '-range'">{{
+              field.range
+            }}</span>
+          </div>
+          @if (errors()[field.key]; as error) {
+            <p class="field__error" [id]="'setting-' + field.key + '-error'">{{ error }}</p>
+          }
+        </div>
       }
-    </p>
 
-    <div class="actions">
-      <p class="actions__note" aria-live="polite">{{ note() }}</p>
-      <div class="actions__buttons">
-        <button type="button" class="button" (click)="resetToDefaults()">Reset to defaults</button>
-        <button type="submit" class="button button--primary" [disabled]="!canApply()">
-          Apply &amp; restart
-        </button>
+      <p class="rate" aria-live="polite">
+        Nominal rate:
+        @if (rate(); as rate) {
+          <strong>{{ rate.perSecond }} updates / second</strong>
+          across all instruments ({{ rate.formula }})
+        } @else {
+          <strong>&mdash;</strong> (fix the errors to see the rate)
+        }
+      </p>
+
+      <div class="actions">
+        <p class="actions__note" aria-live="polite">{{ note() }}</p>
+        <div class="actions__buttons">
+          <button type="button" class="button" (click)="resetToDefaults()">
+            Reset to defaults
+          </button>
+          <!-- aria-disabled instead of disabled: a disabled button gets no hover or
+             focus, so its tooltip could never explain why it is unavailable. -->
+          <app-tooltip tooltipId="apply-tooltip" [text]="applyTooltip()">
+            <button
+              type="submit"
+              class="button button--primary"
+              [class.button--busy]="applying()"
+              [attr.aria-disabled]="!canApply()"
+              aria-describedby="apply-tooltip"
+            >
+              @if (applying()) {
+                <span class="spinner" aria-hidden="true"></span>
+                Applying…
+              } @else {
+                Apply
+              }
+            </button>
+          </app-tooltip>
+        </div>
       </div>
-    </div>
+    </fieldset>
   </form>
 
   <aside class="help" aria-label="About these settings">
-    <section class="card help__item">
+    <section class="card help__item" [class.help__item--fresh]="justApplied()">
       <h2>Active run</h2>
       <p>{{ activeRun() }}</p>
     </section>

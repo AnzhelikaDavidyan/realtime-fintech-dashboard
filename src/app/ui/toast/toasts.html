@@ -1,0 +1,50 @@
+<!-- Always in the DOM so screen readers announce toasts added to it. -->
+<section class="toasts" aria-live="polite" aria-label="Notifications">
+  @for (toast of notifications.toasts(); track toast.id) {
+    <div
+      [class]="'toast toast--' + toast.kind"
+      [attr.role]="toast.kind === 'error' ? 'alert' : 'status'"
+      (mouseenter)="notifications.hold(toast.id)"
+      (mouseleave)="notifications.release(toast.id)"
+      (focusin)="notifications.hold(toast.id)"
+      (focusout)="notifications.release(toast.id)"
+    >
+      <img
+        class="toast__icon"
+        [src]="'icons/toast-' + toast.kind + '.svg'"
+        alt=""
+        width="18"
+        height="18"
+      />
+      <div class="toast__body">
+        <p class="toast__title">{{ toast.title }}</p>
+        <p class="toast__message">{{ toast.message }}</p>
+        @if (toast.link || toast.action) {
+          <div class="toast__actions">
+            @if (toast.action; as action) {
+              <button type="button" class="toast__button" (click)="act(toast)">
+                {{ action.label }}
+              </button>
+            }
+            @if (toast.link; as link) {
+              <a
+                class="toast__link"
+                [routerLink]="link.path"
+                (click)="notifications.dismiss(toast.id)"
+                >{{ link.label }}</a
+              >
+            }
+          </div>
+        }
+      </div>
+      <button
+        type="button"
+        class="toast__close"
+        aria-label="Dismiss notification"
+        (click)="notifications.dismiss(toast.id)"
+      >
+        <span aria-hidden="true">×</span>
+      </button>
+    </div>
+  }
+</section>

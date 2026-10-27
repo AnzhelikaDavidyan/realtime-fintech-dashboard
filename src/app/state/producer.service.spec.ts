@@ -276,6 +276,56 @@ describe('ProducerService', () => {
     });
   });
 
+  describe('run outcome', () => {
+    it('is pending until the worker confirms the run is running', () => {
+      const { service, worker } = setup();
+      expect(service.runOutcome()).toBe('pending');
+      worker().emit({ type: 'ready', producerVersion: '1' });
+      expect(service.runOutcome()).toBe('pending');
+      worker().emit({ type: 'status', status: 'running' });
+      expect(service.runOutcome()).toBe('started');
+    });
+
+    it('is not confirmed by a paused status from an earlier command', () => {
+      const { service, worker } = setup();
+      worker().emit({ type: 'status', status: 'paused' });
+      expect(service.runOutcome()).toBe('pending');
+    });
+
+    it('goes back to pending for every new run', () => {
+      const { service, worker } = setup();
+      worker().emit({ type: 'status', status: 'running' });
+      service.apply({ instruments: 3 });
+      expect(service.runOutcome()).toBe('pending');
+    });
+
+    it('stays started when the run is later paused', () => {
+      const { service, worker } = setup();
+      worker().emit({ type: 'status', status: 'running' });
+      worker().emit({ type: 'status', status: 'paused' });
+      expect(service.runOutcome()).toBe('started');
+    });
+
+    it.each(['init', 'start'] as const)('fails when the %s command fails', (command) => {
+      const { service, worker } = setup();
+      worker().emit({ type: 'error', message: 'Bad settings', command });
+      expect(service.runOutcome()).toBe('failed');
+    });
+
+    it('is not failed by an error from another command', () => {
+      const { service, worker } = setup();
+      worker().emit({ type: 'error', message: 'Not running', command: 'pause' });
+      expect(service.runOutcome()).toBe('pending');
+    });
+
+    it('fails when the worker cannot load or crashes, even after the run started', () => {
+      const { service, worker } = setup();
+      worker().emit({ type: 'status', status: 'running' });
+      worker().crash('Script error');
+      expect(service.runOutcome()).toBe('failed');
+    });
+  });
+
   it('terminates the worker when the app is destroyed', () => {
     const { worker } = setup();
     const current = worker();

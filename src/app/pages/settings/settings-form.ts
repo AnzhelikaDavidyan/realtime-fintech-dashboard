@@ -59,3 +59,11 @@ export function rangeText(key: EditableKey, locale?: string): string {
 export function matchesSettings(value: SettingsFormValue, settings: ProducerSettings): boolean {
   return EDITABLE_KEYS.every((key) => value[key] === settings[key]);
 }
+
+/** "Run #3 · 5 instruments · 100 updates every 500 ms". */
+export function describeRun(runId: number, settings: ProducerSettings, locale?: string): string {
+  const { instruments, updatesPerBatch, batchIntervalMs } = settings;
+  const n = (value: number) => formatVolume(value, { locale });
+  const noun = instruments === 1 ? 'instrument' : 'instruments';
+  return `Run #${runId} · ${n(instruments)} ${noun} · ${n(updatesPerBatch)} updates every ${n(batchIntervalMs)} ms`;
+}
