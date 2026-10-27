@@ -88,8 +88,14 @@ export class ProducerService {
     this.send({ type: 'resume' });
   }
 
-  /** Starts a new run with the given settings (missing values use defaults). */
+  /**
+   * Starts a new run with the given settings (missing values use defaults).
+   * An unusable worker would never answer, so it is replaced first.
+   */
   apply(settings: Partial<ProducerSettings>): void {
+    if (this._status() === 'error') {
+      this.replaceWorker();
+    }
     this.startRun(normalizeProducerSettings(settings));
   }
 
@@ -158,9 +164,11 @@ export class ProducerService {
         } else if (this._status() !== 'error') {
           // Once the worker is unusable, the first message says why; the errors
           // for commands that were waiting would only repeat it.
-          this._error.set(event.message);
           if (isRunCommand(event.command) && this._runOutcome() === 'pending') {
-            this._runOutcome.set('failed');
+            // The run never started, so no data will come until `retry`.
+            this.fail(event.message);
+          } else {
+            this._error.set(event.message);
           }
         }
         break;

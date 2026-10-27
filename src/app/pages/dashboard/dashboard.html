@@ -1,5 +1,6 @@
 <header class="heading">
-  <h1>Live market</h1>
+  <!-- Retry moves focus here: its button goes away, but the heading always stays. -->
+  <h1 tabindex="-1" #heading>Live market</h1>
   <p>Simulated data · generated in WebAssembly inside a Web Worker</p>
 </header>
 
@@ -21,12 +22,16 @@
     </div>
   }
   @case ('error') {
-    <div class="banner banner--error" role="alert">
+    <div class="banner banner--error">
       <span class="banner__icon" aria-hidden="true">⚠</span>
-      <p>
+      <!-- Only the text is the alert; the button is not read out with it. -->
+      <p role="alert">
         <strong>{{ errorTitle() }}</strong>
-        {{ errorMessage() }} Check your connection and retry.
+        {{ errorMessage() }} Retry starts a fresh market engine with the same settings.
       </p>
+      <button type="button" class="banner__action" (click)="retry()">
+        <span aria-hidden="true">↻</span> Retry
+      </button>
     </div>
   }
 }

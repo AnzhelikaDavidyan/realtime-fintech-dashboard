@@ -52,6 +52,7 @@ function setup() {
     return clone.textContent?.replace(/\s+/g, ' ').trim() ?? '';
   };
   const banner = () => el.querySelector('.banner');
+  const retryButton = () => el.querySelector<HTMLButtonElement>('.banner__action');
   const stat = (label: string) =>
     text(
       [...el.querySelectorAll('.stat')]
@@ -60,7 +61,20 @@ function setup() {
     );
   const bodyRows = () => [...el.querySelectorAll('tbody tr')];
   const cells = (row: Element) => [...row.querySelectorAll('th, td')].map(text);
-  return { fixture, el, producer, emit, snapshot, banner, stat, bodyRows, cells, text };
+  return {
+    fixture,
+    el,
+    producer,
+    workers,
+    emit,
+    snapshot,
+    banner,
+    retryButton,
+    stat,
+    bodyRows,
+    cells,
+    text,
+  };
 }
 
 describe('Dashboard', () => {
@@ -179,10 +193,9 @@ describe('Dashboard', () => {
         message: 'Could not download the market engine (/wasm/x.wasm): server answered 404',
       });
 
-      expect(banner()?.getAttribute('role')).toBe('alert');
-      expect(text(banner())).toBe(
+      expect(text(banner()?.querySelector('[role="alert"]') ?? null)).toBe(
         'Producer failed to start. Could not download the market engine (/wasm/x.wasm): ' +
-          'server answered 404. Check your connection and retry.',
+          'server answered 404. Retry starts a fresh market engine with the same settings.',
       );
       expect(stat('Run')).toBe('—');
       expect(stat('Nominal rate')).toBe('—');
@@ -192,7 +205,40 @@ describe('Dashboard', () => {
     it('does not add a second full stop', async () => {
       const { emit, banner, text } = setup();
       await emit({ type: 'error', message: 'Worker crashed.' });
-      expect(text(banner())).toContain('Worker crashed. Check your connection');
+      expect(text(banner())).toContain('Worker crashed. Retry starts');
+    });
+
+    it('shows why the run could not start instead of loading forever', async () => {
+      const { emit, banner, text } = setup();
+      await emit({ type: 'error', message: 'Generator rejected the seed', command: 'start' });
+      expect(text(banner())).toContain('Producer failed to start. Generator rejected the seed.');
+    });
+
+    it('retries with a new worker and moves focus to the heading', async () => {
+      const { fixture, emit, workers, banner, retryButton, text } = setup();
+      await emit({ type: 'error', message: 'Could not download the market engine' });
+      expect(text(retryButton())).toBe('Retry');
+
+      retryButton()!.focus();
+      retryButton()!.click();
+      await fixture.whenStable();
+
+      expect(workers).toHaveLength(2);
+      expect(workers[0].terminated).toBe(true);
+      expect(text(banner())).toContain('Loading the Wasm generator');
+      expect(document.activeElement?.tagName).toBe('H1');
+    });
+
+    it('shows the error again when the retry fails too', async () => {
+      const { fixture, emit, banner, retryButton, text } = setup();
+      await emit({ type: 'error', message: 'Could not download the market engine' });
+      retryButton()!.click();
+      await fixture.whenStable();
+
+      await emit({ type: 'error', message: 'Still offline' });
+
+      expect(text(banner())).toContain('Producer failed to start. Still offline.');
+      expect(retryButton()).not.toBeNull();
     });
 
     it('says the producer stopped when a run ends with an error', async () => {

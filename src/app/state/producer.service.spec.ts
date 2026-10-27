@@ -211,6 +211,16 @@ describe('ProducerService', () => {
       expect(service.error()).toBe('bad settings');
     });
 
+    it.each(['init', 'start'] as const)(
+      'marks the producer unusable when the run fails to start (%s)',
+      (command) => {
+        const { service, worker } = setup();
+        worker().emit({ type: 'error', message: 'Generator rejected the seed', command });
+        expect(service.status()).toBe('error');
+        expect(service.error()).toBe('Generator rejected the seed');
+      },
+    );
+
     it('keeps the load failure message when queued commands then fail too', () => {
       const { service, worker } = setup();
       worker().emit({ type: 'error', message: 'Could not download the market engine' });
@@ -261,6 +271,28 @@ describe('ProducerService', () => {
       ]);
       expect(service.status()).toBe('starting');
       expect(service.error()).toBeNull();
+    });
+
+    it('lets Apply replace a worker that can no longer answer', () => {
+      const { service, workers } = setup();
+      workers[0].crash('Script error');
+
+      service.apply({ instrumentCount: 2 });
+
+      expect(workers).toHaveLength(2);
+      expect(workers[0].terminated).toBe(true);
+      expect(workers[1].sent).toEqual([
+        { type: 'init', settings: { ...DEFAULT_PRODUCER_SETTINGS, instrumentCount: 2 } },
+        { type: 'start', runId: 2 },
+      ]);
+      expect(service.status()).toBe('starting');
+    });
+
+    it('keeps the worker when Apply follows a run that only stopped', () => {
+      const { service, workers } = setup();
+      workers[0].emit({ type: 'status', status: 'finished' });
+      service.apply({ instrumentCount: 2 });
+      expect(workers).toHaveLength(1);
     });
 
     it('ignores anything the replaced worker still sends', () => {

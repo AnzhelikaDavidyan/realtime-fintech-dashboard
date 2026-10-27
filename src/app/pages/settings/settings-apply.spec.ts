@@ -136,6 +136,19 @@ describe('SettingsApply', () => {
     expect(toasts().map((t) => t.kind)).toEqual(['success']);
   });
 
+  it('applies on a fresh worker after the producer failed, instead of waiting forever', () => {
+    const { service, workers, worker, wait, toasts } = setup();
+    workers[0].crash('Script error');
+
+    service.apply(edited);
+    expect(workers).toHaveLength(2);
+    worker().emit({ type: 'status', status: 'running' });
+    wait(MIN_APPLYING_MS);
+
+    expect(service.applying()).toBe(false);
+    expect(toasts().map((t) => t.title)).toEqual(['Settings applied']);
+  });
+
   it('ignores Apply while a run is still starting', () => {
     const { service, worker } = setup();
     service.apply(edited);

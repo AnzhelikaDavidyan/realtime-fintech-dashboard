@@ -1,4 +1,4 @@
-import { Component, computed, inject, linkedSignal } from '@angular/core';
+import { Component, computed, ElementRef, inject, linkedSignal, viewChild } from '@angular/core';
 
 import { InstrumentMetrics } from '../../core/instrument-metrics';
 import { instrumentSymbol, symbolAvatar } from '../../core/instrument-symbols';
@@ -40,6 +40,7 @@ const emptyMetrics = (instrument: number): InstrumentMetrics => ({
 })
 export class Dashboard {
   private readonly producer = inject(ProducerService);
+  private readonly heading = viewChild.required<ElementRef<HTMLElement>>('heading');
 
   protected readonly runId = this.producer.runId;
   protected readonly totalUpdates = this.producer.totalUpdates;
@@ -65,6 +66,13 @@ export class Dashboard {
     const message = this.producer.error() ?? 'The market data worker could not start.';
     return /[.!?]$/.test(message) ? message : `${message}.`;
   });
+
+  /** Starts a fresh worker with the same settings. */
+  protected retry(): void {
+    // The Retry button is about to go away; keep focus at the top of the page.
+    this.heading().nativeElement.focus();
+    this.producer.retry();
+  }
 
   /** Price direction per instrument, compared with the previous snapshot. */
   private readonly trends = linkedSignal<readonly InstrumentMetrics[], TrendState>({
