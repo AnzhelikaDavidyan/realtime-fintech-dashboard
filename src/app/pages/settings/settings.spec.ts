@@ -1,12 +1,30 @@
 import { TestBed } from '@angular/core/testing';
 
-import { DEFAULT_PRODUCER_SETTINGS } from '../../core/producer-settings';
+import { DEFAULT_PRODUCER_SETTINGS, PRODUCER_SETTINGS_LIMITS } from '../../core/producer-settings';
 import { ProducerService } from '../../state/producer.service';
 import {
   FakeProducerWorker,
   provideFakeProducerWorker,
 } from '../../state/testing/fake-producer-worker';
 import { Settings } from './settings';
+import { EDITABLE_KEYS } from './settings-form';
+
+const RANGE_MESSAGES = {
+  instruments: 'Must be between 1 and 50.',
+  updatesPerBatch: 'Must be between 1 and 1,000.',
+  batchIntervalMs: 'Must be between 50 and 2,000.',
+};
+
+/** Every kind of invalid value, for every field, with the message it should show. */
+const INVALID_VALUES = EDITABLE_KEYS.flatMap((key) => {
+  const { min, max } = PRODUCER_SETTINGS_LIMITS[key];
+  return [
+    { key, kind: 'empty', value: '', message: 'Required.' },
+    { key, kind: 'decimal', value: `${min + 0.5}`, message: 'Must be a whole number.' },
+    { key, kind: 'below the minimum', value: `${min - 1}`, message: RANGE_MESSAGES[key] },
+    { key, kind: 'above the maximum', value: `${max + 1}`, message: RANGE_MESSAGES[key] },
+  ];
+});
 
 function setup() {
   const workers: FakeProducerWorker[] = [];
@@ -31,9 +49,10 @@ function setup() {
     field.dispatchEvent(new Event('blur'));
     await fixture.whenStable();
   }
+  const worker = () => workers.at(-1)!;
   /** Commands sent after the default run started (init + start). */
-  const sent = () => workers.at(-1)!.sent.slice(2);
-  return { fixture, el, producer, text, input, wrapper, error, apply, reset, type, sent };
+  const sent = () => worker().sent.slice(2);
+  return { fixture, el, producer, text, input, wrapper, error, apply, reset, type, worker, sent };
 }
 
 describe('Settings page', () => {
@@ -198,6 +217,125 @@ describe('Settings page', () => {
       reset().click();
       await fixture.whenStable();
       expect(error('instruments')).toBe('');
+    });
+  });
+
+  describe('invalid values', () => {
+    it.each(INVALID_VALUES)(
+      '$key: $kind ("$value") shows "$message" and disables Apply',
+      async ({ key, value, message }) => {
+        const { type, error, input, apply } = setup();
+        await type(key, value);
+
+        expect(error(key)).toBe(message);
+        expect(input(key).getAttribute('aria-invalid')).toBe('true');
+        expect(apply().disabled).toBe(true);
+      },
+    );
+
+    it.each(EDITABLE_KEYS)('%s: both ends of the range are valid', async (key) => {
+      const { type, error, apply } = setup();
+      const { min, max } = PRODUCER_SETTINGS_LIMITS[key];
+      for (const value of [min, max]) {
+        await type(key, `${value}`);
+        expect(error(key)).toBe('');
+        expect(apply().disabled).toBe(false);
+      }
+    });
+
+    it('keeps Apply disabled while any one field is invalid', async () => {
+      const { type, apply } = setup();
+      await type('instruments', '20');
+      await type('batchIntervalMs', '49');
+      expect(apply().disabled).toBe(true);
+      await type('batchIntervalMs', '50');
+      expect(apply().disabled).toBe(false);
+    });
+  });
+
+  describe('editing does not affect the producer', () => {
+    it.each([
+      ['valid', { instruments: '20', updatesPerBatch: '1000', batchIntervalMs: '50' }],
+      ['invalid', { instruments: '', updatesPerBatch: '12.5', batchIntervalMs: '2001' }],
+    ])('%s edits send nothing and keep the active run', async (_, values) => {
+      const { type, producer, worker, sent } = setup();
+      worker().emit({ type: 'status', status: 'running' });
+      for (const [key, value] of Object.entries(values)) {
+        await type(key, value);
+      }
+
+      expect(sent()).toEqual([]);
+      expect(producer.runId()).toBe(1);
+      expect(producer.activeSettings()).toEqual(DEFAULT_PRODUCER_SETTINGS);
+      expect(producer.status()).toBe('running');
+    });
+
+    it('Reset to defaults sends nothing either', async () => {
+      const { type, reset, sent, fixture } = setup();
+      await type('instruments', '20');
+      reset().click();
+      await fixture.whenStable();
+      expect(sent()).toEqual([]);
+    });
+  });
+
+  describe('Apply sends the new settings', () => {
+    const edited = { instruments: 20, updatesPerBatch: 1000, batchIntervalMs: 50 };
+
+    async function editAll(type: (key: string, value: string) => Promise<void>) {
+      for (const [key, value] of Object.entries(edited)) {
+        await type(key, `${value}`);
+      }
+    }
+
+    it('sends init with every edited field and the kept seed, then starts the next run', async () => {
+      const { type, apply, producer, sent, fixture } = setup();
+      producer.apply({ ...DEFAULT_PRODUCER_SETTINGS, seed: 7 });
+      const before = producer.runId();
+      await editAll(type);
+      const sentBefore = sent().length;
+
+      apply().click();
+      await fixture.whenStable();
+
+      const expected = { seed: 7, ...edited };
+      expect(sent().slice(sentBefore)).toEqual([
+        { type: 'init', settings: expected },
+        { type: 'start', runId: before + 1 },
+      ]);
+      expect(producer.runId()).toBe(before + 1);
+      expect(producer.activeSettings()).toEqual(expected);
+    });
+
+    it('also works by submitting the form (Enter key)', async () => {
+      const { type, el, sent, fixture } = setup();
+      await editAll(type);
+      el.querySelector('form')!.dispatchEvent(new Event('submit'));
+      await fixture.whenStable();
+      expect(sent()).toEqual([
+        { type: 'init', settings: { ...DEFAULT_PRODUCER_SETTINGS, ...edited } },
+        { type: 'start', runId: 2 },
+      ]);
+    });
+
+    it('starts a new run while paused', async () => {
+      const { type, apply, worker, producer, sent, fixture } = setup();
+      worker().emit({ type: 'status', status: 'paused' });
+      await editAll(type);
+      apply().click();
+      await fixture.whenStable();
+      expect(sent().map((command) => command.type)).toEqual(['init', 'start']);
+      expect(producer.runId()).toBe(2);
+    });
+
+    it('sends nothing when clicked again with no further edits', async () => {
+      const { type, apply, sent, fixture } = setup();
+      await editAll(type);
+      apply().click();
+      await fixture.whenStable();
+      apply().click();
+      await fixture.whenStable();
+      expect(sent()).toHaveLength(2);
     });
   });
 });
