@@ -38,7 +38,10 @@ p {
 
 .form {
   position: relative;
+  display: flex;
   flex: 0 1 620px;
+  flex-direction: column;
+  gap: 20px;
   min-width: 0;
   padding: 26px;
   overflow: hidden;
@@ -222,7 +225,7 @@ p {
   }
 
   /* Still shown at full strength while applying: it says what is happening. */
-  &--busy:disabled {
+  &--busy[aria-disabled='true'] {
     opacity: 1;
     cursor: progress;
   }

@@ -1,9 +1,12 @@
-<!-- Always in the DOM so screen readers announce toasts added to it. -->
-<section class="toasts" aria-live="polite" aria-label="Notifications">
+<!-- Screen readers hear each toast once, from these regions; they stay in the DOM
+     so changes to them are announced. Errors interrupt, success waits its turn. -->
+<p class="visually-hidden" aria-live="polite">{{ announcement().polite }}</p>
+<p class="visually-hidden" aria-live="assertive">{{ announcement().assertive }}</p>
+
+<section class="toasts" aria-label="Notifications">
   @for (toast of notifications.toasts(); track toast.id) {
     <div
       [class]="'toast toast--' + toast.kind"
-      [attr.role]="toast.kind === 'error' ? 'alert' : 'status'"
       (mouseenter)="notifications.hold(toast.id)"
       (mouseleave)="notifications.release(toast.id)"
       (focusin)="notifications.hold(toast.id)"

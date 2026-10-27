@@ -409,10 +409,27 @@ describe('Settings page', () => {
       expect(form.getAttribute('aria-busy')).toBe('true');
       expect(el.querySelector('fieldset')!.disabled).toBe(true);
       expect(text(apply())).toBe('Applying…');
+      expect(apply().getAttribute('aria-disabled')).toBe('true');
       expect(text(el.querySelector('.actions__note'))).toBe(
         'Applying settings: starting a new run…',
       );
       expect(text(el.querySelector('#apply-tooltip'))).toBe('Starting the new run…');
+    });
+
+    it('keeps keyboard focus on Apply and locks Reset', () => {
+      const page = setup();
+      const field = page.input('instruments');
+      field.value = '20';
+      field.dispatchEvent(new Event('input'));
+      page.fixture.detectChanges();
+      page.apply().focus();
+      page.apply().click();
+      page.fixture.detectChanges();
+
+      // `:disabled` also covers a disabled parent fieldset, unlike the `disabled` property.
+      expect(page.apply().matches(':disabled')).toBe(false);
+      expect(document.activeElement).toBe(page.apply());
+      expect(page.reset().matches(':disabled')).toBe(true);
     });
 
     it('stays until the worker confirms the new run', () => {

@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 import { Notifications, Toast } from './notifications';
@@ -12,6 +12,18 @@ import { Notifications, Toast } from './notifications';
 })
 export class Toasts {
   protected readonly notifications = inject(Notifications);
+
+  /** Text of the newest success and error toast, for the live regions. */
+  protected readonly announcement = computed(() => {
+    const latest = (kind: Toast['kind']) => {
+      const toast = this.notifications
+        .toasts()
+        .filter((t) => t.kind === kind)
+        .at(-1);
+      return toast ? `${toast.title}. ${toast.message}` : '';
+    };
+    return { polite: latest('success'), assertive: latest('error') };
+  });
 
   protected act(toast: Toast): void {
     this.notifications.dismiss(toast.id);

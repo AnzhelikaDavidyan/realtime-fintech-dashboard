@@ -17,24 +17,34 @@ function setup() {
 }
 
 describe('Toasts', () => {
-  it('keeps an empty live region ready for announcements', async () => {
+  it('keeps empty live regions ready for announcements', async () => {
     const { el, render } = setup();
     await render();
-    const region = el.querySelector('section')!;
-    expect(region.getAttribute('aria-live')).toBe('polite');
-    expect(region.children).toHaveLength(0);
+    const regions = [...el.querySelectorAll('[aria-live]')];
+    expect(regions.map((r) => r.getAttribute('aria-live'))).toEqual(['polite', 'assertive']);
+    expect(regions.map((r) => r.textContent?.trim())).toEqual(['', '']);
   });
 
-  it('shows success as a status and errors as an alert', async () => {
+  it('announces success politely and errors assertively, once each', async () => {
     const { el, render, notifications } = setup();
     notifications.show({ kind: 'success', title: 'Settings applied', message: 'Run #2 started.' });
     notifications.show({ kind: 'error', title: 'Couldn’t apply settings', message: 'Bad.' });
     await render();
 
-    const toasts = [...el.querySelectorAll('.toast')];
-    expect(toasts.map((t) => t.getAttribute('role'))).toEqual(['status', 'alert']);
-    expect(toasts[0].querySelector('.toast__title')?.textContent).toBe('Settings applied');
-    expect(toasts[0].querySelector('.toast__message')?.textContent).toBe('Run #2 started.');
+    const text = (live: string) => el.querySelector(`[aria-live="${live}"]`)?.textContent?.trim();
+    expect(text('polite')).toBe('Settings applied. Run #2 started.');
+    expect(text('assertive')).toBe('Couldn’t apply settings. Bad.');
+    // The visible toasts are not live regions too, or each would be read twice.
+    expect(el.querySelectorAll('.toast[role], .toasts[aria-live]')).toHaveLength(0);
+  });
+
+  it('shows each toast with its title and message', async () => {
+    const { el, render, notifications } = setup();
+    notifications.show({ kind: 'success', title: 'Settings applied', message: 'Run #2 started.' });
+    await render();
+    const toast = el.querySelector('.toast--success')!;
+    expect(toast.querySelector('.toast__title')?.textContent).toBe('Settings applied');
+    expect(toast.querySelector('.toast__message')?.textContent).toBe('Run #2 started.');
   });
 
   it('dismisses a toast with its close button', async () => {
