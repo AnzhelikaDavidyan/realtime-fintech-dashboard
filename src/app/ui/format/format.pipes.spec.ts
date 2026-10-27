@@ -1,4 +1,4 @@
-import { Component, signal } from '@angular/core';
+import { Component, DEFAULT_CURRENCY_CODE, LOCALE_ID, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
 import { ImbalancePipe, PricePipe, VolumePipe } from './format.pipes';
@@ -30,7 +30,7 @@ describe('format pipes in a template', () => {
     const { text } = render();
     expect(text('price')).toBe('$102.00');
     expect(text('volume')).toBe('1,234,567');
-    expect(text('imbalance')).toBe('−0.35');
+    expect(text('imbalance')).toBe('\u22120.35');
   });
 
   it('shows dashes for values that are not available yet', async () => {
@@ -40,5 +40,18 @@ describe('format pipes in a template', () => {
     fixture.componentInstance.imbalance.set(null);
     await fixture.whenStable();
     expect([text('price'), text('volume'), text('imbalance')]).toEqual(['—', '—', '—']);
+  });
+
+  it('follows the app locale and currency', () => {
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: LOCALE_ID, useValue: 'de-DE' },
+        { provide: DEFAULT_CURRENCY_CODE, useValue: 'EUR' },
+      ],
+    });
+    const { text } = render();
+    expect(text('price')).toBe('102,00\u00a0€');
+    expect(text('volume')).toBe('1.234.567');
+    expect(text('imbalance')).toBe('\u22120,35');
   });
 });

@@ -1,6 +1,6 @@
 import { formatImbalance, formatPrice, formatVolume, NO_VALUE } from './formatters';
 
-const MINUS = '−';
+const MINUS = '\u2212';
 
 describe('formatPrice', () => {
   it.each([
@@ -67,5 +67,24 @@ describe('missing values', () => {
 
   it('uses an em dash', () => {
     expect(NO_VALUE).toBe('—');
+  });
+});
+
+describe('locale and currency', () => {
+  const de = { locale: 'de-DE', currency: 'EUR' };
+
+  it('formats prices for another locale and currency', () => {
+    // German uses "." for thousands, "," for decimals and a non-breaking space before €.
+    expect(formatPrice(123_450, de)).toBe('1.234,50\u00a0€');
+  });
+
+  it('formats volume and imbalance for another locale', () => {
+    expect(formatVolume(1_234_567, de)).toBe('1.234.567');
+    expect(formatImbalance(-0.35, de)).toBe(`${MINUS}0,35`);
+    expect(formatImbalance(0.2, de)).toBe('+0,20');
+  });
+
+  it('defaults to en-US and USD', () => {
+    expect(formatPrice(123_450)).toBe('$1,234.50');
   });
 });
