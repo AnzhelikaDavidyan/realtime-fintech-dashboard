@@ -38,7 +38,7 @@ describe('ProducerControls', () => {
   it('shows the nominal rate while running and pauses on click', async () => {
     const { emit, status, button, text, sent } = setup();
     await emit({ type: 'status', status: 'running' });
-    expect(text(status())).toBe('Running · 1,000 upd/s');
+    expect(text(status())).toBe('Running · 200 upd/s');
     expect(status().querySelector('img')?.getAttribute('src')).toBe('icons/status-running.svg');
 
     button().click();

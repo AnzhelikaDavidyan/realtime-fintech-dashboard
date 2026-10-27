@@ -2,6 +2,7 @@ import { Component, computed, inject, linkedSignal } from '@angular/core';
 
 import { InstrumentMetrics } from '../../core/instrument-metrics';
 import { instrumentSymbol, symbolAvatar } from '../../core/instrument-symbols';
+import { nominalRate } from '../../core/producer-settings';
 import { ProducerService } from '../../state/producer.service';
 import { ImbalancePipe, PricePipe, VolumePipe } from '../../ui/format/format.pipes';
 import { ImbalanceBar } from '../../ui/imbalance-bar/imbalance-bar';
@@ -43,7 +44,7 @@ export class Dashboard {
   protected readonly runId = this.producer.runId;
   protected readonly totalUpdates = this.producer.totalUpdates;
   protected readonly instruments = computed(() => this.producer.activeSettings().instruments);
-  protected readonly rate = computed(() => this.producer.activeSettings().updatesPerSecond);
+  protected readonly rate = computed(() => nominalRate(this.producer.activeSettings()));
 
   protected readonly view = computed<DashboardView>(() => {
     const status = this.producer.status();

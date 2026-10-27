@@ -110,7 +110,10 @@ describe('ProducerWorkerHost', () => {
     it('starts runs with the settings from init', async () => {
       const { host, time, ofType } = setup();
       await host.loaded;
-      host.receive({ type: 'init', settings: { instruments: 4, updatesPerSecond: 2_000 } });
+      host.receive({
+        type: 'init',
+        settings: { instruments: 4, updatesPerBatch: 250, batchIntervalMs: 125 },
+      });
       host.receive({ type: 'start', runId: 9 });
       time.advance(500);
       const last = ofType('snapshot').at(-1)!;
@@ -136,7 +139,8 @@ describe('ProducerWorkerHost', () => {
       const { host, time, posted } = setup();
       await host.loaded;
       host.receive({ type: 'start', runId: 1 });
-      time.advance(100);
+      // Default settings: the first batch lands after 500 ms, its snapshot within 100 ms.
+      time.advance(600);
       const snapshot = posted.find((p) => p.message.type === 'snapshot')!;
       const metrics = (snapshot.message as Extract<WorkerEvent, { type: 'snapshot' }>).metrics;
       expect(snapshot.transfer).toEqual([metrics.buffer]);

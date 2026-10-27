@@ -1,0 +1,81 @@
+<header class="heading">
+  <h1>Producer settings</h1>
+  <p>Changes take effect only after Apply. The current run keeps going while you edit.</p>
+</header>
+
+<div class="content">
+  <form class="card form" [formGroup]="form" (ngSubmit)="apply()" novalidate>
+    @for (field of fields; track field.key) {
+      <div class="field">
+        <label class="field__label" [for]="'setting-' + field.key">{{ field.label }}</label>
+        <p class="field__hint" [id]="'setting-' + field.key + '-hint'">{{ field.hint }}</p>
+        <div
+          class="input"
+          [class.input--changed]="changed()[field.key] && !errors()[field.key]"
+          [class.input--invalid]="!!errors()[field.key]"
+        >
+          <input
+            type="number"
+            inputmode="numeric"
+            step="1"
+            [id]="'setting-' + field.key"
+            [formControlName]="field.key"
+            [attr.aria-invalid]="!!errors()[field.key]"
+            [attr.aria-describedby]="
+              'setting-' +
+              field.key +
+              '-hint setting-' +
+              field.key +
+              '-range' +
+              (errors()[field.key] ? ' setting-' + field.key + '-error' : '')
+            "
+          />
+          <span class="input__range" [id]="'setting-' + field.key + '-range'">{{
+            field.range
+          }}</span>
+        </div>
+        @if (errors()[field.key]; as error) {
+          <p class="field__error" [id]="'setting-' + field.key + '-error'">{{ error }}</p>
+        }
+      </div>
+    }
+
+    <p class="rate" aria-live="polite">
+      Nominal rate:
+      @if (rate(); as rate) {
+        <strong>{{ rate.perSecond }} updates / second</strong>
+        across all instruments ({{ rate.formula }})
+      } @else {
+        <strong>&mdash;</strong> (fix the errors to see the rate)
+      }
+    </p>
+
+    <div class="actions">
+      <p class="actions__note" aria-live="polite">{{ note() }}</p>
+      <div class="actions__buttons">
+        <button type="button" class="button" (click)="resetToDefaults()">Reset to defaults</button>
+        <button type="submit" class="button button--primary" [disabled]="!canApply()">
+          Apply &amp; restart
+        </button>
+      </div>
+    </div>
+  </form>
+
+  <aside class="help" aria-label="About these settings">
+    <section class="card help__item">
+      <h2>Active run</h2>
+      <p>{{ activeRun() }}</p>
+    </section>
+    <section class="card help__item">
+      <h2>What Apply does</h2>
+      <p>
+        Starts a new run with these settings, clears all prices, volumes and VWAP, and starts
+        generating even if the dashboard was paused.
+      </p>
+    </section>
+    <section class="card help__item">
+      <h2>Allowed values</h2>
+      <p>{{ allowedValues }}</p>
+    </section>
+  </aside>
+</div>

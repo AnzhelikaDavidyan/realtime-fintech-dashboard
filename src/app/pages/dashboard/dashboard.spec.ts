@@ -71,7 +71,7 @@ describe('Dashboard', () => {
       expect(banner()?.getAttribute('role')).toBe('status');
 
       const rows = bodyRows();
-      expect(rows).toHaveLength(10);
+      expect(rows).toHaveLength(5);
       // Prices show a dash (announced as "not available"), volume shows 0.
       expect(cells(rows[0])).toEqual([
         'ALFA',
@@ -92,8 +92,8 @@ describe('Dashboard', () => {
     it('shows run information', () => {
       const { stat } = setup();
       expect(stat('Run')).toBe('#1');
-      expect(stat('Instruments')).toBe('10');
-      expect(stat('Nominal rate')).toBe('1,000 upd/s');
+      expect(stat('Instruments')).toBe('5');
+      expect(stat('Nominal rate')).toBe('200 upd/s');
       expect(stat('Trades this run')).toBe('0');
     });
   });
@@ -186,7 +186,7 @@ describe('Dashboard', () => {
       );
       expect(stat('Run')).toBe('—');
       expect(stat('Nominal rate')).toBe('—');
-      expect(stat('Instruments')).toBe('10');
+      expect(stat('Instruments')).toBe('5');
     });
 
     it('does not add a second full stop', async () => {

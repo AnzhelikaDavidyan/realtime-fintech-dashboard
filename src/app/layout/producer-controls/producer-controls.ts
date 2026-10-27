@@ -1,5 +1,6 @@
 import { Component, computed, inject } from '@angular/core';
 
+import { nominalRate } from '../../core/producer-settings';
 import { ProducerService } from '../../state/producer.service';
 import { VolumePipe } from '../../ui/format/format.pipes';
 
@@ -19,7 +20,7 @@ type Action = 'pause' | 'resume' | 'retry';
 export class ProducerControls {
   private readonly producer = inject(ProducerService);
 
-  protected readonly rate = computed(() => this.producer.activeSettings().updatesPerSecond);
+  protected readonly rate = computed(() => nominalRate(this.producer.activeSettings()));
 
   protected readonly tone = computed<Tone>(() => {
     switch (this.producer.status()) {

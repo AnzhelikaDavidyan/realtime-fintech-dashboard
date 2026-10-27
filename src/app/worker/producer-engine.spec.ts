@@ -1,7 +1,7 @@
 import { MARKET_UPDATE_STRIDE } from '../core/market-update';
 import { decodeMetrics } from '../core/metrics-codec';
 import { WorkerEvent } from '../core/worker-protocol';
-import { BatchGenerator, MAX_TICK_GAP_MS, ProducerEngine, TICK_MS } from './producer-engine';
+import { BatchGenerator, ProducerEngine, SNAPSHOT_INTERVAL_MS } from './producer-engine';
 import { FakeTime } from './testing/fake-time';
 
 /** Generator stub: valid updates spread over instruments, trade quantity 1. */
@@ -23,8 +23,13 @@ function setup() {
   const time = new FakeTime();
   const events: WorkerEvent[] = [];
   const generators: { seed: number; instruments: number; generator: FakeGenerator }[] = [];
+  let failNextGenerator = false;
   const engine = new ProducerEngine({
     createGenerator: (seed, instruments) => {
+      if (failNextGenerator) {
+        failNextGenerator = false;
+        throw new Error('bad settings');
+      }
       const generator = new FakeGenerator(instruments);
       generators.push({ seed, instruments, generator });
       return generator;
@@ -35,10 +40,16 @@ function setup() {
   });
   const snapshots = () => events.filter((e) => e.type === 'snapshot');
   const statuses = () => events.filter((e) => e.type === 'status').map((e) => e.status);
-  return { time, events, generators, engine, snapshots, statuses };
+  const failNext = () => (failNextGenerator = true);
+  return { time, events, generators, engine, snapshots, statuses, failNext };
 }
 
-const settings = { seed: 7, instruments: 3, updatesPerSecond: 1_000, snapshotIntervalMs: 100 };
+/** 10 updates every 100 ms: a nominal 100 updates / second. */
+const settings = { seed: 7, instruments: 3, updatesPerBatch: 10, batchIntervalMs: 100 };
+
+/** Sum of traded volume across instruments in a snapshot. */
+const volumeOf = (s: Extract<WorkerEvent, { type: 'snapshot' }>) =>
+  decodeMetrics(s.metrics).reduce((sum, m) => sum + m.volume, 0);
 
 describe('ProducerEngine', () => {
   it('starts idle with nothing scheduled', () => {
@@ -55,21 +66,24 @@ describe('ProducerEngine', () => {
       expect(generators[0]).toMatchObject({ seed: 7, instruments: 3 });
       expect(engine.status).toBe('running');
       expect(statuses()).toEqual(['running']);
-      expect(time.activeTimers).toBe(1);
+      expect(time.activeTimers).toBe(2); // batches + snapshots
     });
 
-    it('generates updates at the requested rate', () => {
-      const { engine, time } = setup();
+    it('generates updatesPerBatch updates every batchIntervalMs', () => {
+      const { engine, time, generators } = setup();
       engine.start(1, settings);
       time.advance(1_000);
-      expect(engine.totalUpdates).toBe(1_000);
+      expect(generators[0].generator.requested).toEqual(Array(10).fill(10));
+      expect(engine.totalUpdates).toBe(100);
     });
 
-    it('keeps low rates accurate by carrying fractions between ticks', () => {
+    it('waits a full interval before the first batch', () => {
       const { engine, time } = setup();
-      engine.start(1, { ...settings, updatesPerSecond: 3 });
-      time.advance(10_000);
-      expect(engine.totalUpdates).toBe(30);
+      engine.start(1, { ...settings, batchIntervalMs: 500 });
+      time.advance(499);
+      expect(engine.totalUpdates).toBe(0);
+      time.advance(1);
+      expect(engine.totalUpdates).toBe(10);
     });
 
     it('normalizes settings before using them', () => {
@@ -77,28 +91,36 @@ describe('ProducerEngine', () => {
       engine.start(1, { instruments: 0 });
       expect(generators[0].instruments).toBe(1);
     });
+
+    it('leaves the current run untouched if the new generator cannot be created', () => {
+      const { engine, time, snapshots, failNext } = setup();
+      engine.start(1, settings);
+      time.advance(200);
+      failNext();
+
+      expect(() => engine.start(2, settings)).toThrow('bad settings');
+      expect(engine.status).toBe('running');
+      expect(time.activeTimers).toBe(2);
+      time.advance(200);
+      expect(snapshots().at(-1)!.runId).toBe(1);
+      expect(engine.totalUpdates).toBe(40);
+    });
   });
 
   describe('snapshots', () => {
-    it('are throttled to about 10 per second', () => {
+    it('are sent at most every 100 ms (about 10 per second) with fast batches', () => {
       const { engine, time, snapshots } = setup();
-      engine.start(1, settings);
+      engine.start(1, { ...settings, batchIntervalMs: 50 });
       time.advance(1_000);
-      expect(snapshots()).toHaveLength(10);
+      expect(snapshots()).toHaveLength(1_000 / SNAPSHOT_INTERVAL_MS);
+      expect(snapshots().at(-1)!.totalUpdates).toBe(200);
     });
 
-    it('follow a slower interval from the settings', () => {
+    it('are only sent when a batch changed something', () => {
       const { engine, time, snapshots } = setup();
-      engine.start(1, { ...settings, snapshotIntervalMs: 500 });
+      engine.start(1, { ...settings, batchIntervalMs: 500 });
       time.advance(1_000);
       expect(snapshots()).toHaveLength(2);
-    });
-
-    it('never exceed 10 per second, even if asked to', () => {
-      const { engine, time, snapshots } = setup();
-      engine.start(1, { ...settings, snapshotIntervalMs: 10 });
-      time.advance(1_000);
-      expect(snapshots().length).toBeLessThanOrEqual(10);
     });
 
     it('are tagged with the run id and carry metrics for every instrument', () => {
@@ -108,17 +130,13 @@ describe('ProducerEngine', () => {
       const last = snapshots().at(-1)!;
       expect(snapshots().every((s) => s.runId === 42)).toBe(true);
       expect(decodeMetrics(last.metrics).map((m) => m.instrument)).toEqual([0, 1, 2]);
-      expect(last.totalUpdates).toBe(300);
-      expect(decodeMetrics(last.metrics).reduce((sum, m) => sum + m.volume, 0)).toBe(300);
+      expect(last.totalUpdates).toBe(30);
+      expect(volumeOf(last)).toBe(30);
       expect(last.timestamp).toBe(time.now);
     });
   });
 
   describe('pause, resume and run switching', () => {
-    /** Sum of traded volume across instruments in a snapshot. */
-    const volumeOf = (s: Extract<WorkerEvent, { type: 'snapshot' }>) =>
-      decodeMetrics(s.metrics).reduce((sum, m) => sum + m.volume, 0);
-
     describe('pause', () => {
       it('stops batches: the generator is not called again', () => {
         const { engine, time, generators } = setup();
@@ -130,7 +148,7 @@ describe('ProducerEngine', () => {
         time.advance(5_000);
 
         expect(generators[0].generator.requested).toHaveLength(calls);
-        expect(engine.totalUpdates).toBe(200);
+        expect(engine.totalUpdates).toBe(20);
         expect(time.activeTimers).toBe(0);
       });
 
@@ -154,37 +172,23 @@ describe('ProducerEngine', () => {
         const before = snapshots().at(-1)!;
 
         engine.resume();
-        expect(engine.totalUpdates).toBe(300);
+        expect(engine.totalUpdates).toBe(30);
 
         time.advance(100);
         const after = snapshots().at(-1)!;
-        expect(after.totalUpdates).toBe(before.totalUpdates + 100);
-        expect(volumeOf(after)).toBe(volumeOf(before) + 100);
+        expect(after.totalUpdates).toBe(before.totalUpdates + 10);
+        expect(volumeOf(after)).toBe(volumeOf(before) + 10);
       });
 
       it('generates nothing for the paused time', () => {
-        const { engine, time, generators } = setup();
+        const { engine, time } = setup();
         engine.start(1, settings);
         time.advance(200);
         engine.pause();
-        time.advance(10_000);
-        engine.resume();
-        time.advance(TICK_MS);
-
-        // First batch after resume covers one tick, not the 10 s pause.
-        expect(generators[0].generator.requested.at(-1)).toBe(TICK_MS);
-        time.advance(300 - TICK_MS);
-        expect(engine.totalUpdates).toBe(200 + 300);
-      });
-
-      it('does not catch up even after a pause longer than the gap limit', () => {
-        const { engine, time } = setup();
-        engine.start(1, settings);
-        engine.pause();
         time.advance(60_000);
         engine.resume();
-        time.advance(100);
-        expect(engine.totalUpdates).toBe(100);
+        time.advance(300);
+        expect(engine.totalUpdates).toBe(20 + 30);
       });
     });
 
@@ -199,8 +203,8 @@ describe('ProducerEngine', () => {
         time.advance(100);
         const first = snapshots().at(-1)!;
         expect(first.runId).toBe(2);
-        expect(first.totalUpdates).toBe(100);
-        expect(volumeOf(first)).toBe(100);
+        expect(first.totalUpdates).toBe(10);
+        expect(volumeOf(first)).toBe(10);
       });
 
       it('uses a fresh generator and stops calling the old one', () => {
@@ -213,7 +217,15 @@ describe('ProducerEngine', () => {
 
         expect(generators[1].seed).toBe(99);
         expect(generators[0].generator.requested).toHaveLength(oldCalls);
-        expect(time.activeTimers).toBe(1);
+        expect(time.activeTimers).toBe(2);
+      });
+
+      it('uses the new batch size and interval', () => {
+        const { engine, time, generators } = setup();
+        engine.start(1, settings);
+        engine.start(2, { ...settings, updatesPerBatch: 7, batchIntervalMs: 250 });
+        time.advance(1_000);
+        expect(generators[1].generator.requested).toEqual([7, 7, 7, 7]);
       });
 
       it('resets a paused run and starts running', () => {
@@ -225,7 +237,7 @@ describe('ProducerEngine', () => {
         time.advance(100);
 
         expect(engine.status).toBe('running');
-        expect(engine.totalUpdates).toBe(100);
+        expect(engine.totalUpdates).toBe(10);
       });
     });
 
@@ -233,7 +245,7 @@ describe('ProducerEngine', () => {
       it('never sends the old run id after switching, even with a snapshot due', () => {
         const { engine, time, snapshots } = setup();
         engine.start(1, settings);
-        time.advance(450); // run 1's next snapshot would be due at 500
+        time.advance(450); // run 1 has a batch waiting for its next snapshot
         const switchedAt = snapshots().length;
         engine.start(2, settings);
         time.advance(2_000);
@@ -265,14 +277,6 @@ describe('ProducerEngine', () => {
       });
     });
 
-    it('limits make-up work after a long gap between ticks', () => {
-      const { engine, time } = setup();
-      engine.start(1, settings);
-      time.jump(30_000);
-      time.advance(TICK_MS);
-      expect(engine.totalUpdates).toBe(MAX_TICK_GAP_MS);
-    });
-
     it('ignores pause and resume in the wrong state', () => {
       const { engine, time, statuses } = setup();
       engine.pause();
@@ -289,7 +293,7 @@ describe('ProducerEngine', () => {
   });
 
   describe('finish', () => {
-    it('stops the timer and ignores pause and resume afterwards', () => {
+    it('stops the timers and ignores pause and resume afterwards', () => {
       const { engine, time, statuses } = setup();
       engine.start(1, settings);
       engine.finish();
@@ -308,7 +312,7 @@ describe('ProducerEngine', () => {
       engine.start(2, settings);
       time.advance(100);
       expect(engine.status).toBe('running');
-      expect(engine.totalUpdates).toBe(100);
+      expect(engine.totalUpdates).toBe(10);
     });
   });
 
@@ -326,7 +330,7 @@ describe('ProducerEngine', () => {
       emit: (e) => events.push(e),
     });
     engine.start(1, settings);
-    time.advance(TICK_MS);
+    time.advance(settings.batchIntervalMs);
 
     expect(events).toContainEqual({ type: 'error', message: 'wasm trapped' });
     expect(engine.status).toBe('finished');

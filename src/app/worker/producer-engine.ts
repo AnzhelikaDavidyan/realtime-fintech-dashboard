@@ -25,14 +25,13 @@ export interface ProducerEngineDeps {
   readonly emit: (event: WorkerEvent) => void;
 }
 
-/** How often the engine wakes up to generate updates. */
-export const TICK_MS = 50;
-/** Longest gap one tick makes up for (e.g. after a throttled background tab). */
-export const MAX_TICK_GAP_MS = 1_000;
+/** Snapshots go to the UI at most this often (about 10 per second). */
+export const SNAPSHOT_INTERVAL_MS = 100;
 
 /**
- * Drives the market generator at a target rate, folds updates into metrics
- * and emits throttled snapshots tagged with the current run id.
+ * Generates `updatesPerBatch` updates every `batchIntervalMs`, folds them into
+ * metrics, and sends a snapshot tagged with the run id at most every
+ * SNAPSHOT_INTERVAL_MS, and only when a batch has changed something.
  *
  * Lifecycle: idle → start → running ⇄ pause/resume → finish → finished.
  * `start` is allowed from any state and begins a fresh run. `pause` outside
@@ -45,12 +44,10 @@ export class ProducerEngine {
   private settings: ProducerSettings = normalizeProducerSettings();
   private generator: BatchGenerator | null = null;
   private metrics: MetricsAggregator | null = null;
-  private cancelTimer: (() => void) | null = null;
-  private lastTickAt = 0;
-  private lastSnapshotAt = 0;
-  /** Fraction of an update owed from earlier ticks, so low rates stay accurate. */
-  private carry = 0;
+  private cancelTimers: (() => void) | null = null;
   private generated = 0;
+  /** True when a batch arrived since the last snapshot. */
+  private changed = false;
 
   constructor(private readonly deps: ProducerEngineDeps) {}
 
@@ -62,19 +59,22 @@ export class ProducerEngine {
     return this.generated;
   }
 
-  /** Starts a fresh run, discarding any previous run's state. */
+  /**
+   * Starts a fresh run, discarding any previous run's state. The new generator
+   * is created first, so if that fails the current run is left untouched.
+   */
   start(runId: number, settings: Partial<ProducerSettings>): void {
-    this.stopTimer();
+    const next = normalizeProducerSettings(settings);
+    const generator = this.deps.createGenerator(next.seed, next.instruments);
+
+    this.stopTimers();
     this.runId = runId;
-    this.settings = normalizeProducerSettings(settings);
-    this.generator = this.deps.createGenerator(this.settings.seed, this.settings.instruments);
-    this.metrics = new MetricsAggregator(this.settings.instruments);
-    this.carry = 0;
+    this.settings = next;
+    this.generator = generator;
+    this.metrics = new MetricsAggregator(next.instruments);
     this.generated = 0;
-    const now = this.deps.clock();
-    this.lastTickAt = now;
-    this.lastSnapshotAt = now;
-    this.startTimer();
+    this.changed = false;
+    this.startTimers();
     this.setStatus('running');
   }
 
@@ -83,18 +83,16 @@ export class ProducerEngine {
     if (this.state !== 'running') {
       return;
     }
-    this.stopTimer();
+    this.stopTimers();
     this.setStatus('paused');
   }
 
-  /** Continues from now; time spent paused is not generated afterwards. */
+  /** Continues with the next batch; time spent paused is never made up. */
   resume(): void {
     if (this.state !== 'paused') {
       return;
     }
-    this.lastTickAt = this.deps.clock();
-    this.carry = 0;
-    this.startTimer();
+    this.startTimers();
     this.setStatus('running');
   }
 
@@ -103,19 +101,21 @@ export class ProducerEngine {
     if (this.state === 'finished') {
       return;
     }
-    this.stopTimer();
+    this.stopTimers();
     this.generator = null;
     this.setStatus('finished');
   }
 
-  private tick(): void {
+  private batch(): void {
     if (this.state !== 'running' || !this.generator || !this.metrics) {
       return;
     }
     try {
-      this.step(this.generator, this.metrics);
+      this.metrics.ingest(this.generator.generateBatch(this.settings.updatesPerBatch));
+      this.generated += this.settings.updatesPerBatch;
+      this.changed = true;
     } catch (error) {
-      // A failing generator would fail again on every tick, so end the run.
+      // A failing generator would fail again on every batch, so end the run.
       this.deps.emit({
         type: 'error',
         message: error instanceof Error ? error.message : String(error),
@@ -124,38 +124,34 @@ export class ProducerEngine {
     }
   }
 
-  private step(generator: BatchGenerator, metrics: MetricsAggregator): void {
-    const now = this.deps.clock();
-    const elapsed = Math.min(now - this.lastTickAt, MAX_TICK_GAP_MS);
-    this.lastTickAt = now;
-
-    const due = (elapsed * this.settings.updatesPerSecond) / 1_000 + this.carry;
-    const count = Math.floor(due);
-    this.carry = due - count;
-    if (count > 0) {
-      metrics.ingest(generator.generateBatch(count));
-      this.generated += count;
+  private snapshot(): void {
+    if (this.state !== 'running' || !this.metrics || !this.changed) {
+      return;
     }
-
-    if (now - this.lastSnapshotAt >= this.settings.snapshotIntervalMs) {
-      this.lastSnapshotAt = now;
-      this.deps.emit({
-        type: 'snapshot',
-        runId: this.runId,
-        metrics: encodeMetrics(metrics.snapshot()),
-        totalUpdates: this.generated,
-        timestamp: now,
-      });
-    }
+    this.changed = false;
+    this.deps.emit({
+      type: 'snapshot',
+      runId: this.runId,
+      metrics: encodeMetrics(this.metrics.snapshot()),
+      totalUpdates: this.generated,
+      timestamp: this.deps.clock(),
+    });
   }
 
-  private startTimer(): void {
-    this.cancelTimer = this.deps.scheduler.every(TICK_MS, () => this.tick());
+  private startTimers(): void {
+    const stopBatches = this.deps.scheduler.every(this.settings.batchIntervalMs, () =>
+      this.batch(),
+    );
+    const stopSnapshots = this.deps.scheduler.every(SNAPSHOT_INTERVAL_MS, () => this.snapshot());
+    this.cancelTimers = () => {
+      stopBatches();
+      stopSnapshots();
+    };
   }
 
-  private stopTimer(): void {
-    this.cancelTimer?.();
-    this.cancelTimer = null;
+  private stopTimers(): void {
+    this.cancelTimers?.();
+    this.cancelTimers = null;
   }
 
   private setStatus(status: WorkerStatus): void {

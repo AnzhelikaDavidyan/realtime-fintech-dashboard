@@ -108,9 +108,9 @@ describe('ProducerService', () => {
 
     it('normalizes the settings it starts with', () => {
       const { service, sentSinceStartup } = setup();
-      service.apply({ instruments: 3.4, updatesPerSecond: 1e9 });
+      service.apply({ instruments: 3.4, updatesPerBatch: 1e9 });
 
-      const settings = { ...DEFAULT_PRODUCER_SETTINGS, instruments: 3, updatesPerSecond: 100_000 };
+      const settings = { ...DEFAULT_PRODUCER_SETTINGS, instruments: 3, updatesPerBatch: 1_000 };
       expect(service.activeSettings()).toEqual(settings);
       expect(sentSinceStartup()[0]).toEqual({ type: 'init', settings });
     });

@@ -4,10 +4,10 @@ export interface ProducerSettings {
   readonly seed: number;
   /** Number of simulated instruments. */
   readonly instruments: number;
-  /** Target market updates generated per second. */
-  readonly updatesPerSecond: number;
-  /** How often the worker posts a metrics snapshot to the UI, in milliseconds (at most 10 per second). */
-  readonly snapshotIntervalMs: number;
+  /** Updates generated per batch, across all instruments. */
+  readonly updatesPerBatch: number;
+  /** Requested time between batches, in milliseconds. */
+  readonly batchIntervalMs: number;
 }
 
 export interface Range {
@@ -17,17 +17,22 @@ export interface Range {
 
 export const PRODUCER_SETTINGS_LIMITS: Readonly<Record<keyof ProducerSettings, Range>> = {
   seed: { min: 0, max: Number.MAX_SAFE_INTEGER },
-  instruments: { min: 1, max: 100 },
-  updatesPerSecond: { min: 1, max: 100_000 },
-  snapshotIntervalMs: { min: 100, max: 5_000 },
+  instruments: { min: 1, max: 50 },
+  updatesPerBatch: { min: 1, max: 1_000 },
+  batchIntervalMs: { min: 50, max: 2_000 },
 };
 
 export const DEFAULT_PRODUCER_SETTINGS: ProducerSettings = {
   seed: 42,
-  instruments: 10,
-  updatesPerSecond: 1_000,
-  snapshotIntervalMs: 100,
+  instruments: 5,
+  updatesPerBatch: 100,
+  batchIntervalMs: 500,
 };
+
+/** Updates per second the settings ask for: batch size × 1000 / interval. */
+export function nominalRate({ updatesPerBatch, batchIntervalMs }: ProducerSettings): number {
+  return (updatesPerBatch * 1_000) / batchIntervalMs;
+}
 
 /**
  * Fills missing values with defaults, rounds to integers and clamps each value
@@ -37,8 +42,8 @@ export function normalizeProducerSettings(input: Partial<ProducerSettings> = {})
   return {
     seed: normalizeField(input, 'seed'),
     instruments: normalizeField(input, 'instruments'),
-    updatesPerSecond: normalizeField(input, 'updatesPerSecond'),
-    snapshotIntervalMs: normalizeField(input, 'snapshotIntervalMs'),
+    updatesPerBatch: normalizeField(input, 'updatesPerBatch'),
+    batchIntervalMs: normalizeField(input, 'batchIntervalMs'),
   };
 }
 

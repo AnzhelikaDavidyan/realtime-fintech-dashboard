@@ -30,7 +30,7 @@ describe('App', () => {
     const fixture = TestBed.createComponent(App);
     await TestBed.inject(Router).navigateByUrl('/settings');
     await fixture.whenStable();
-    expect(fixture.nativeElement.querySelector('h1')?.textContent).toBe('Settings');
+    expect(fixture.nativeElement.querySelector('h1')?.textContent).toBe('Producer settings');
   });
 
   it('shows the not-found page for unknown urls', async () => {
