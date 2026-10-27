@@ -45,6 +45,7 @@ export class ProducerService {
 
   private readonly _status = signal<ProducerStatus>('starting');
   private readonly _rows = signal<readonly InstrumentMetrics[]>([]);
+  private readonly _totalUpdates = signal(0);
   private readonly _runId = signal(0);
   private readonly _activeSettings = signal<ProducerSettings>(DEFAULT_PRODUCER_SETTINGS);
   private readonly _error = signal<string | null>(null);
@@ -52,6 +53,8 @@ export class ProducerService {
   readonly status = this._status.asReadonly();
   /** Latest metrics for every instrument, from the current run only. */
   readonly rows = this._rows.asReadonly();
+  /** Updates generated in the current run (each one carries a trade). */
+  readonly totalUpdates = this._totalUpdates.asReadonly();
   readonly runId = this._runId.asReadonly();
   readonly activeSettings = this._activeSettings.asReadonly();
   /** Last problem reported by the worker, or null. */
@@ -87,6 +90,7 @@ export class ProducerService {
     this._runId.set(runId);
     this._activeSettings.set(settings);
     this._rows.set([]);
+    this._totalUpdates.set(0);
     this._error.set(null);
     this.send({ type: 'init', settings });
     this.send({ type: 'start', runId });
@@ -124,6 +128,7 @@ export class ProducerService {
       case 'snapshot':
         if (event.runId === this._runId()) {
           this._rows.set(decodeMetrics(event.metrics));
+          this._totalUpdates.set(event.totalUpdates);
         }
         break;
       case 'error':
@@ -131,7 +136,9 @@ export class ProducerService {
         // so nothing more will arrive until `retry`.
         if (event.command === undefined) {
           this.fail(event.message);
-        } else {
+        } else if (this._status() !== 'error') {
+          // Once the worker is unusable, the first message says why; the errors
+          // for commands that were waiting would only repeat it.
           this._error.set(event.message);
         }
         break;

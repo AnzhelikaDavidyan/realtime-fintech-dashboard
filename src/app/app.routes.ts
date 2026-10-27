@@ -4,17 +4,17 @@ export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
   {
     path: 'dashboard',
-    title: 'Dashboard · Findev',
+    title: 'Dashboard · FinDev Markets',
     loadComponent: () => import('./pages/dashboard/dashboard').then((m) => m.Dashboard),
   },
   {
     path: 'settings',
-    title: 'Settings · Findev',
+    title: 'Settings · FinDev Markets',
     loadComponent: () => import('./pages/settings/settings').then((m) => m.Settings),
   },
   {
     path: '**',
-    title: 'Page not found · Findev',
+    title: 'Page not found · FinDev Markets',
     loadComponent: () => import('./pages/not-found/not-found').then((m) => m.NotFound),
   },
 ];

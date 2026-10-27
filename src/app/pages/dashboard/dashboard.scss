@@ -1,0 +1,230 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+p {
+  margin: 0;
+}
+
+.heading {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  h1 {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 700;
+  }
+
+  p {
+    color: var(--text-muted);
+    font-size: 13px;
+  }
+}
+
+/* Banners: loading (neutral), paused (warning), error (danger). */
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 14px 14px 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 14px;
+
+  strong {
+    color: var(--text-strong);
+    font-weight: 600;
+  }
+
+  &--paused {
+    border-color: var(--warning);
+    background: var(--warning-wash);
+    color: var(--warning-on-wash);
+  }
+
+  &--error {
+    border-color: var(--danger);
+    background: var(--danger-wash);
+    color: var(--danger-on-wash);
+  }
+}
+
+.banner__icon {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.stat__label {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.stat__value {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+/* The table keeps the design's column widths and scrolls sideways on small screens. */
+.table-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.market {
+  width: 100%;
+  min-width: 920px;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 14px;
+}
+
+.col--instrument {
+  width: 18.3%;
+}
+.col--price,
+.col--spread,
+.col--vwap {
+  width: 15.5%;
+}
+.col--volume {
+  width: 13.9%;
+}
+.col--imbalance {
+  width: 21.3%;
+}
+
+th,
+td {
+  padding: 13px 18px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.num {
+  text-align: right;
+}
+
+thead th {
+  background: var(--surface-header);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+tbody tr {
+  border-top: 1px solid var(--border-row);
+}
+
+tbody th {
+  font-weight: 700;
+}
+
+tbody td {
+  font-weight: 400;
+}
+
+.instrument {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.instrument__avatar {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: var(--surface-raised);
+  color: var(--text-accent);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.price {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.price__value {
+  font-weight: 500;
+}
+
+.trend {
+  font-size: 11px;
+
+  &--up {
+    color: var(--up);
+  }
+
+  &--down {
+    color: var(--down);
+  }
+}
+
+.imbalance {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.imbalance__value {
+  font-weight: 500;
+
+  &.up {
+    color: var(--up);
+  }
+
+  &.down {
+    color: var(--down);
+  }
+}
+
+/* Values not available yet: a fainter dash, as in the design. */
+app-value.is-missing {
+  color: var(--text-faint);
+  font-weight: 400;
+}
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 24px;
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+@media (max-width: 720px) {
+  .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

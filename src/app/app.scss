@@ -1,50 +1,93 @@
 .shell {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  min-height: 100dvh;
 }
 
 .shell__header {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  grid-template-areas: 'brand nav actions';
   align-items: center;
-  gap: 2rem;
-  padding: 0 1.5rem;
-  height: 56px;
+  gap: 12px;
+  min-height: 64px;
+  padding: 0 28px;
   border-bottom: 1px solid var(--border);
-  background: var(--surface);
+  background: var(--surface-bar);
 }
 
 .shell__brand {
-  font-weight: 700;
-  font-size: 1.125rem;
+  grid-area: brand;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  justify-self: start;
   color: var(--text);
+  font-size: 16px;
+  font-weight: 700;
   text-decoration: none;
 }
 
+.shell__logo {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: linear-gradient(to right, #3b82f6, #22c55e);
+}
+
 .shell__nav {
+  grid-area: nav;
   display: flex;
-  gap: 0.25rem;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-sunken);
 }
 
 .shell__link {
-  padding: 0.5rem 0.75rem;
-  border-radius: 6px;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
   color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 500;
   text-decoration: none;
 
   &:hover {
     color: var(--text);
-    background: var(--surface-hover);
   }
 
   &--active {
-    color: var(--text);
-    background: var(--surface-hover);
-    font-weight: 600;
+    background: var(--surface-raised);
+    color: var(--text-strong);
   }
+}
+
+.shell__actions {
+  grid-area: actions;
+  justify-self: end;
 }
 
 .shell__content {
   flex: 1;
-  padding: 1.5rem;
+  padding: 24px 28px;
+}
+
+/* Narrow screens: brand and actions on top, navigation below. */
+@media (max-width: 720px) {
+  .shell__header {
+    grid-template-columns: auto 1fr;
+    grid-template-areas:
+      'brand actions'
+      'nav nav';
+    padding: 12px 16px;
+  }
+
+  .shell__nav {
+    justify-self: center;
+  }
+
+  .shell__content {
+    padding: 20px 16px;
+  }
 }

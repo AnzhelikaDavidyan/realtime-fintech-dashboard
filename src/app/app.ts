@@ -1,6 +1,8 @@
 import { Component } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 
+import { ProducerControls } from './layout/producer-controls/producer-controls';
+
 interface NavItem {
   path: string;
   label: string;
@@ -8,7 +10,7 @@ interface NavItem {
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, ProducerControls],
   templateUrl: './app.html',
   styleUrl: './app.scss',
 })

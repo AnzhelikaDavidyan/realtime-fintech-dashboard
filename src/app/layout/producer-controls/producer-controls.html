@@ -1,0 +1,31 @@
+<span class="status" [class]="'status status--' + tone()" role="status">
+  <img [src]="'icons/status-' + tone() + '.svg'" alt="" width="8" height="8" />
+  @switch (tone()) {
+    @case ('running') {
+      Running · {{ rate() | volume }} upd/s
+    }
+    @case ('paused') {
+      Paused
+    }
+    @case ('error') {
+      Error
+    }
+    @default {
+      Starting producer…
+    }
+  }
+</span>
+
+<button type="button" [class]="'action action--' + action()" (click)="act()">
+  @switch (action()) {
+    @case ('resume') {
+      <span aria-hidden="true">▶</span> Resume
+    }
+    @case ('retry') {
+      <span aria-hidden="true">↻</span> Retry
+    }
+    @default {
+      <span aria-hidden="true">❚❚</span> Pause
+    }
+  }
+</button>

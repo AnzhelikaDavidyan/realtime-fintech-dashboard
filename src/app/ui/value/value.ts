@@ -11,6 +11,8 @@ import { NO_VALUE } from '../format/formatters';
  */
 @Component({
   selector: 'app-value',
+  // Lets the parent style a missing value, e.g. a fainter dash.
+  host: { '[class.is-missing]': 'missing()' },
   template: `
     @if (missing()) {
       <span aria-hidden="true">{{ dash }}</span>

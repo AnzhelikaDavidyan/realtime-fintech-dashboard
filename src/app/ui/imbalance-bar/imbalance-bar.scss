@@ -1,0 +1,38 @@
+:host {
+  position: relative;
+  display: inline-block;
+  flex: none;
+  width: 90px;
+  height: 12px;
+}
+
+.track,
+.fill {
+  position: absolute;
+  top: 3px;
+  height: 6px;
+  border-radius: 3px;
+}
+
+.track {
+  left: 0;
+  width: 90px;
+  background: var(--bar-track);
+}
+
+.fill--buy {
+  background: var(--up-strong);
+}
+
+.fill--sell {
+  background: var(--down-strong);
+}
+
+.center {
+  position: absolute;
+  top: 0;
+  left: 44px;
+  width: 2px;
+  height: 12px;
+  background: var(--bar-center);
+}

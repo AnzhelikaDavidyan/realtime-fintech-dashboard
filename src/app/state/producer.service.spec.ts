@@ -116,6 +116,21 @@ describe('ProducerService', () => {
     });
   });
 
+  describe('total updates', () => {
+    it('follows the current run and resets for a new one', () => {
+      const { service, worker } = setup();
+      expect(service.totalUpdates()).toBe(0);
+      worker().emit({ ...snapshot(1, [row(0, 5)]), totalUpdates: 1_200 } as WorkerEvent);
+      expect(service.totalUpdates()).toBe(1_200);
+
+      service.apply({ instruments: 1 });
+      expect(service.totalUpdates()).toBe(0);
+
+      worker().emit({ ...snapshot(1, [row(0, 5)]), totalUpdates: 9_999 } as WorkerEvent);
+      expect(service.totalUpdates()).toBe(0);
+    });
+  });
+
   describe('pause and resume', () => {
     it('sends pause and resume and follows the status the worker reports', () => {
       const { service, worker, sentSinceStartup } = setup();
@@ -194,6 +209,17 @@ describe('ProducerService', () => {
       worker().emit({ type: 'error', message: 'bad settings', command: 'start' });
       expect(service.status()).toBe('running');
       expect(service.error()).toBe('bad settings');
+    });
+
+    it('keeps the load failure message when queued commands then fail too', () => {
+      const { service, worker } = setup();
+      worker().emit({ type: 'error', message: 'Could not download the market engine' });
+      worker().emit({
+        type: 'error',
+        message: 'The market engine is unavailable: Could not download the market engine',
+        command: 'start',
+      });
+      expect(service.error()).toBe('Could not download the market engine');
     });
 
     it('keeps showing why a run ended', () => {

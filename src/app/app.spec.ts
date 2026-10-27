@@ -23,7 +23,7 @@ describe('App', () => {
     const fixture = TestBed.createComponent(App);
     await TestBed.inject(Router).navigateByUrl('/');
     await fixture.whenStable();
-    expect(fixture.nativeElement.querySelector('h1')?.textContent).toBe('Dashboard');
+    expect(fixture.nativeElement.querySelector('h1')?.textContent).toBe('Live market');
   });
 
   it('navigates to settings', async () => {

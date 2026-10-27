@@ -1,6 +1,10 @@
 <div class="shell">
   <header class="shell__header">
-    <a class="shell__brand" routerLink="/dashboard">Findev</a>
+    <a class="shell__brand" routerLink="/dashboard">
+      <span class="shell__logo" aria-hidden="true"></span>
+      FinDev Markets
+    </a>
+
     <nav class="shell__nav" aria-label="Main">
       @for (item of navItems; track item.path) {
         <a
@@ -13,6 +17,8 @@
         </a>
       }
     </nav>
+
+    <app-producer-controls class="shell__actions" />
   </header>
 
   <main class="shell__content">

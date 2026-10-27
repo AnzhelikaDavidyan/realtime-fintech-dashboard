@@ -1,22 +1,57 @@
+/* Design tokens from the Figma file "Findev — Realtime Fintech Dashboard (UX)". The design is dark only. */
 :root {
-  color-scheme: light dark;
-  --bg: #f6f7f9;
-  --surface: #ffffff;
-  --surface-hover: #eef0f4;
-  --border: #e2e5ea;
-  --text: #14171c;
-  --text-muted: #5b6370;
-}
+  color-scheme: dark;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0f1115;
-    --surface: #171a20;
-    --surface-hover: #22262e;
-    --border: #2a2f38;
-    --text: #e8eaee;
-    --text-muted: #9aa3b2;
-  }
+  /* Surfaces */
+  --bg: #0e131d;
+  --surface-bar: #111826;
+  --surface: #121a27;
+  --surface-header: #101724;
+  --surface-sunken: #0b111c;
+  --surface-raised: #1d2738;
+  --border: #1f2733;
+  --border-row: #182030;
+
+  /* Text */
+  --text: #e6eaf2;
+  --text-strong: #ffffff;
+  --text-muted: #8a95a8;
+  --text-faint: #5b6679;
+  --text-accent: #93c5fd;
+
+  /* Market direction */
+  --up: #4ade80;
+  --up-strong: #22c55e;
+  --down: #f87171;
+  --down-strong: #ef4444;
+  --bar-track: #1d2738;
+  --bar-center: #3a4558;
+
+  /* States */
+  --info: #3b82f6;
+  --info-text: #93c5fd;
+  --info-soft: rgb(59 130 246 / 14%);
+  --success-text: #4ade80;
+  --success-soft: rgb(34 197 94 / 14%);
+  --warning: #eab308;
+  --warning-text: #facc15;
+  --warning-soft: rgb(234 179 8 / 14%);
+  --warning-wash: rgb(234 179 8 / 8%);
+  --warning-on-wash: #fde68a;
+  --danger: #ef4444;
+  --danger-text: #fca5a5;
+  --danger-soft: rgb(239 68 68 / 14%);
+  --danger-wash: rgb(239 68 68 / 8%);
+  --danger-on-wash: #fecaca;
+
+  /* Buttons */
+  --button-bg: #18202e;
+  --button-border: #2a3446;
+  --button-on-warning: #111111;
+
+  --radius-sm: 7px;
+  --radius-md: 9px;
+  --radius-lg: 12px;
 }
 
 *,
@@ -44,9 +79,16 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family:
+    Inter,
     system-ui,
     -apple-system,
     'Segoe UI',
     Roboto,
     sans-serif;
+}
+
+/* Keyboard focus, visible on the dark theme. */
+:focus-visible {
+  outline: 2px solid var(--info);
+  outline-offset: 2px;
 }

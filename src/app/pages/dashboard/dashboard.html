@@ -1,0 +1,134 @@
+<header class="heading">
+  <h1>Live market</h1>
+  <p>Simulated data · generated in WebAssembly inside a Web Worker</p>
+</header>
+
+@switch (view()) {
+  @case ('loading') {
+    <div class="banner" role="status">
+      <span class="banner__icon" aria-hidden="true">⟳</span>
+      <p>Loading the Wasm generator in the worker&hellip; values appear with the first batch.</p>
+    </div>
+  }
+  @case ('paused') {
+    <div class="banner banner--paused" role="status">
+      <span class="banner__icon" aria-hidden="true">⏸</span>
+      <p>
+        <strong>Generation paused.</strong>
+        Values and totals are frozen. Resume continues from here &mdash; nothing is generated for
+        the paused time.
+      </p>
+    </div>
+  }
+  @case ('error') {
+    <div class="banner banner--error" role="alert">
+      <span class="banner__icon" aria-hidden="true">⚠</span>
+      <p>
+        <strong>{{ errorTitle() }}</strong>
+        {{ errorMessage() }} Check your connection and retry.
+      </p>
+    </div>
+  }
+}
+
+<section class="stats" aria-label="Run information">
+  <div class="stat">
+    <span class="stat__label">Run</span>
+    <span class="stat__value">
+      @if (view() === 'error') {
+        &mdash;
+      } @else {
+        #{{ runId() }}
+      }
+    </span>
+  </div>
+  <div class="stat">
+    <span class="stat__label">Instruments</span>
+    <span class="stat__value">{{ instruments() }}</span>
+  </div>
+  <div class="stat">
+    <span class="stat__label">Nominal rate</span>
+    <span class="stat__value">
+      @if (view() === 'error') {
+        &mdash;
+      } @else {
+        {{ rate() | volume }} upd/s
+      }
+    </span>
+  </div>
+  <div class="stat">
+    <span class="stat__label">Trades this run</span>
+    <span class="stat__value">{{ totalUpdates() | volume }}</span>
+  </div>
+</section>
+
+<div class="table-scroll">
+  <table class="market">
+    <caption class="visually-hidden">
+      Live market data per instrument
+    </caption>
+    <colgroup>
+      <col class="col--instrument" />
+      <col class="col--price" />
+      <col class="col--spread" />
+      <col class="col--volume" />
+      <col class="col--vwap" />
+      <col class="col--imbalance" />
+    </colgroup>
+    <thead>
+      <tr>
+        <th scope="col">Instrument</th>
+        <th scope="col" class="num">Last price</th>
+        <th scope="col" class="num">Bid&ndash;ask spread</th>
+        <th scope="col" class="num">Volume</th>
+        <th scope="col" class="num">VWAP</th>
+        <th scope="col" class="num">Order-book imbalance</th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (row of rows(); track row.symbol) {
+        <tr>
+          <th scope="row">
+            <span class="instrument">
+              <span class="instrument__avatar" aria-hidden="true">{{ row.avatar }}</span>
+              {{ row.symbol }}
+            </span>
+          </th>
+          <td class="num">
+            <span class="price">
+              @if (row.trend === 'up') {
+                <span class="trend trend--up" aria-hidden="true">▲</span>
+                <span class="visually-hidden">rising</span>
+              } @else if (row.trend === 'down') {
+                <span class="trend trend--down" aria-hidden="true">▼</span>
+                <span class="visually-hidden">falling</span>
+              }
+              <app-value class="price__value" [text]="row.metrics.lastPrice | price" />
+            </span>
+          </td>
+          <td class="num"><app-value [text]="row.metrics.spread | price" /></td>
+          <td class="num"><app-value [text]="row.metrics.volume | volume" /></td>
+          <td class="num"><app-value [text]="row.metrics.vwap | price" /></td>
+          <td class="num">
+            <span class="imbalance">
+              <app-value
+                class="imbalance__value"
+                [class.up]="(row.metrics.imbalance ?? 0) > 0"
+                [class.down]="(row.metrics.imbalance ?? 0) < 0"
+                [text]="row.metrics.imbalance | imbalance"
+              />
+              @if (row.metrics.imbalance !== null) {
+                <app-imbalance-bar [value]="row.metrics.imbalance" />
+              }
+            </span>
+          </td>
+        </tr>
+      }
+    </tbody>
+  </table>
+</div>
+
+<footer class="footer">
+  <p>Table refreshes ~10&times;/s · every generated trade is counted in Volume &amp; VWAP</p>
+  <p>Prices in USD · imbalance &minus;1 (sell pressure) &hellip; +1 (buy pressure)</p>
+</footer>

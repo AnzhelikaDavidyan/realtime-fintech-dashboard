@@ -1,0 +1,70 @@
+:host {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+
+  img {
+    display: block;
+    flex: none;
+  }
+
+  &--starting {
+    background: var(--info-soft);
+    color: var(--info-text);
+  }
+
+  &--running {
+    background: var(--success-soft);
+    color: var(--success-text);
+  }
+
+  &--paused {
+    background: var(--warning-soft);
+    color: var(--warning-text);
+  }
+
+  &--error {
+    background: var(--danger-soft);
+    color: var(--danger-text);
+  }
+}
+
+.action {
+  padding: 9px 16px;
+  border: 1px solid var(--button-border);
+  border-radius: var(--radius-md);
+  background: var(--button-bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+
+  &:hover {
+    filter: brightness(1.15);
+  }
+
+  &--resume {
+    border-color: var(--warning);
+    background: var(--warning);
+    color: var(--button-on-warning);
+  }
+
+  &--retry {
+    border-color: var(--info);
+    background: var(--info);
+    color: var(--text-strong);
+  }
+}
