@@ -1,11 +1,12 @@
 /// <reference lib="webworker" />
 
+import { producerWasmUrl } from '../wasm/wasm-url';
 import { loadProducerWasm } from './load-producer-wasm';
 import { ProducerWorkerHost } from './producer-worker-host';
 
-// The build copies the .wasm next to the app; resolving against the worker
-// script keeps it working under a base path such as GitHub Pages.
-const wasmUrl = new URL('wasm/findev_wasm_bg.wasm', self.location.href);
+// Resolving against the worker script keeps it working under a base path such
+// as GitHub Pages; the content hash keeps browsers from using a stale .wasm.
+const wasmUrl = producerWasmUrl(self.location.href);
 
 const host = new ProducerWorkerHost({
   port: { postMessage: (message, transfer) => self.postMessage(message, transfer) },

@@ -1,5 +1,7 @@
 import init, { version } from '@findev/wasm';
 
+import { producerWasmUrl } from './wasm-url';
+
 export interface Producer {
   version(): string;
 }
@@ -11,7 +13,7 @@ let ready: Promise<Producer> | undefined;
  * `wasm/` by the build, so it resolves against the app's base href.
  */
 export function loadProducer(): Promise<Producer> {
-  ready ??= init({ module_or_path: new URL('wasm/findev_wasm_bg.wasm', document.baseURI) })
+  ready ??= init({ module_or_path: producerWasmUrl(document.baseURI) })
     .then(() => ({ version }))
     .catch((error: unknown) => {
       ready = undefined;

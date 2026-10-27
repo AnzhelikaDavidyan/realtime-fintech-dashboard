@@ -78,8 +78,9 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
+  /* Inter is self-hosted (@fontsource-variable/inter, see angular.json); no third-party request. */
   font-family:
-    Inter,
+    'Inter Variable',
     system-ui,
     -apple-system,
     'Segoe UI',

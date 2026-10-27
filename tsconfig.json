@@ -14,7 +14,8 @@
     "target": "ES2022",
     "module": "preserve",
     "paths": {
-      "@findev/wasm": ["./wasm/pkg/findev_wasm"]
+      "@findev/wasm": ["./wasm/pkg/findev_wasm"],
+      "@findev/wasm-hash": ["./wasm/pkg/build_hash"]
     }
   },
   "angularCompilerOptions": {

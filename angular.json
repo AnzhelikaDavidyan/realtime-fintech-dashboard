@@ -35,7 +35,7 @@
                 "output": "wasm"
               }
             ],
-            "styles": ["src/styles.scss"],
+            "styles": ["@fontsource-variable/inter/index.css", "src/styles.scss"],
             "webWorkerTsConfig": "tsconfig.worker.json"
           },
           "configurations": {
