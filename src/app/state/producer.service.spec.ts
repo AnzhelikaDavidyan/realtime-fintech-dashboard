@@ -159,6 +159,33 @@ describe('ProducerService', () => {
     });
   });
 
+  describe('price trends', () => {
+    const priced = (lastPrice: number): InstrumentMetrics => ({ ...row(0, 1), lastPrice });
+
+    it('compares each snapshot with the previous one of the same run', () => {
+      const { service, worker } = setup();
+      worker().emit(snapshot(1, [priced(100)]));
+      expect(service.trends().get(0)).toBeUndefined();
+
+      worker().emit(snapshot(1, [priced(101)]));
+      expect(service.trends().get(0)).toBe('up');
+      worker().emit(snapshot(1, [priced(99)]));
+      expect(service.trends().get(0)).toBe('down');
+    });
+
+    it('starts a new run without arrows', () => {
+      const { service, worker } = setup();
+      worker().emit(snapshot(1, [priced(100)]));
+      service.trends(); // read every snapshot, as the dashboard does
+      worker().emit(snapshot(1, [priced(101)]));
+      expect(service.trends().get(0)).toBe('up');
+
+      service.apply({ instrumentCount: 1 });
+      worker().emit(snapshot(2, [priced(200)]));
+      expect(service.trends().size).toBe(0);
+    });
+  });
+
   describe('stale runs', () => {
     it('ignores late snapshots from the previous run', () => {
       const { service, worker } = setup();

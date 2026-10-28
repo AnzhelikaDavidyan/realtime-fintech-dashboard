@@ -1,12 +1,12 @@
-import { Component, computed, ElementRef, inject, linkedSignal, viewChild } from '@angular/core';
+import { Component, computed, ElementRef, inject, viewChild } from '@angular/core';
 
 import { InstrumentMetrics } from '../../core/instrument-metrics';
 import { instrumentSymbol, symbolAvatar } from '../../core/instrument-symbols';
+import { Trend } from '../../core/price-trend';
 import { nominalRate } from '../../core/producer-settings';
 import { ProducerService } from '../../state/producer.service';
 import { ImbalancePipe, PricePipe, VolumePipe } from '../../ui/format/format.pipes';
 import { ImbalanceBar } from '../../ui/imbalance-bar/imbalance-bar';
-import { nextTrends, NO_TRENDS, Trend, TrendState } from '../../ui/price-trend';
 import { Value } from '../../ui/value/value';
 
 /** Which of the design's dashboard screens to show. */
@@ -74,16 +74,10 @@ export class Dashboard {
     this.producer.retry();
   }
 
-  /** Price direction per instrument, compared with the previous snapshot. */
-  private readonly trends = linkedSignal<readonly InstrumentMetrics[], TrendState>({
-    source: this.producer.rows,
-    computation: (rows, previous) => nextTrends(previous?.value ?? NO_TRENDS, rows),
-  });
-
   /** One row per instrument of the run; placeholders until its first snapshot. */
   protected readonly rows = computed<readonly MarketRow[]>(() => {
     const byId = new Map(this.producer.rows().map((m) => [m.instrument, m]));
-    const trends = this.trends().trends;
+    const trends = this.producer.trends();
     return Array.from({ length: this.instrumentCount() }, (_, i) => {
       const symbol = instrumentSymbol(i);
       return {

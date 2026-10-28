@@ -1,4 +1,4 @@
-import { InstrumentMetrics } from '../core/instrument-metrics';
+import { InstrumentMetrics } from './instrument-metrics';
 
 /** Direction of the last price compared with the previous snapshot. */
 export type Trend = 'up' | 'down';

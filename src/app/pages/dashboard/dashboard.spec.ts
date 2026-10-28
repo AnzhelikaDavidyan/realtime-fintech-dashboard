@@ -162,6 +162,18 @@ describe('Dashboard', () => {
       expect(el.querySelectorAll('.visually-hidden')[1]?.textContent).toBe('rising');
     });
 
+    it('keeps the arrows after leaving the page and coming back', async () => {
+      const { producer, emit, snapshot } = setup();
+      producer.apply({ instrumentCount: 1 });
+      await emit({ type: 'status', status: 'running' }, snapshot([metrics(0, { lastPrice: 100 })]));
+      await emit(snapshot([metrics(0, { lastPrice: 99 })]));
+
+      const again = TestBed.createComponent(Dashboard);
+      await again.whenStable();
+      const arrow = (again.nativeElement as HTMLElement).querySelector('.trend');
+      expect(arrow?.className).toBe('trend trend--down');
+    });
+
     it('reuses the arrow element when a price changes direction', async () => {
       const { producer, emit, snapshot, el } = setup();
       producer.apply({ instrumentCount: 1 });

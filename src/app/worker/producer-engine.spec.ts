@@ -7,7 +7,12 @@ import { FakeTime } from './testing/fake-time';
 /** Generator stub: valid updates spread over instruments, trade quantity 1. */
 class FakeGenerator implements BatchGenerator {
   readonly requested: number[] = [];
+  freed = 0;
   constructor(private readonly instrumentCount: number) {}
+
+  free(): void {
+    this.freed++;
+  }
 
   generateBatch(n: number): Int32Array {
     this.requested.push(n);
@@ -220,6 +225,18 @@ describe('ProducerEngine', () => {
         expect(time.activeTimers).toBe(2);
       });
 
+      it('frees the replaced generator once and keeps the new one', () => {
+        const { engine, generators, failNext } = setup();
+        engine.start(1, settings);
+        failNext();
+        expect(() => engine.start(2, settings)).toThrow('bad settings');
+        expect(generators[0].generator.freed).toBe(0);
+
+        engine.start(3, settings);
+        expect(generators[0].generator.freed).toBe(1);
+        expect(generators[1].generator.freed).toBe(0);
+      });
+
       it('uses the new batch size and interval', () => {
         const { engine, time, generators } = setup();
         engine.start(1, settings);
@@ -314,6 +331,14 @@ describe('ProducerEngine', () => {
       expect(engine.status).toBe('running');
       expect(engine.totalUpdates).toBe(10);
     });
+
+    it('frees the generator once', () => {
+      const { engine, generators } = setup();
+      engine.start(1, settings);
+      engine.finish();
+      engine.finish();
+      expect(generators[0].generator.freed).toBe(1);
+    });
   });
 
   it('reports a generator failure and ends the run', () => {
@@ -322,6 +347,10 @@ describe('ProducerEngine', () => {
     const engine = new ProducerEngine({
       createGenerator: () => ({
         generateBatch: () => {
+          throw new Error('wasm trapped');
+        },
+        // A trapped Wasm instance can fail to free as well.
+        free: () => {
           throw new Error('wasm trapped');
         },
       }),

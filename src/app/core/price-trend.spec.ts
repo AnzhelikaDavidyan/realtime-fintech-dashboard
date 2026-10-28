@@ -1,4 +1,4 @@
-import { InstrumentMetrics } from '../core/instrument-metrics';
+import { InstrumentMetrics } from './instrument-metrics';
 import { NO_TRENDS, nextTrends, TrendState } from './price-trend';
 
 const row = (instrument: number, lastPrice: number | null): InstrumentMetrics => ({

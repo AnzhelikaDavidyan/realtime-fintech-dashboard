@@ -1,7 +1,16 @@
-import { DestroyRef, inject, Injectable, InjectionToken, signal } from '@angular/core';
+import {
+  computed,
+  DestroyRef,
+  inject,
+  Injectable,
+  InjectionToken,
+  linkedSignal,
+  signal,
+} from '@angular/core';
 
 import { InstrumentMetrics } from '../core/instrument-metrics';
 import { decodeMetrics } from '../core/metrics-codec';
+import { nextTrends, NO_TRENDS, TrendState } from '../core/price-trend';
 import {
   DEFAULT_PRODUCER_SETTINGS,
   normalizeProducerSettings,
@@ -73,6 +82,21 @@ export class ProducerService {
   /** Last problem reported by the worker, or null. */
   readonly error = this._error.asReadonly();
   readonly runOutcome = this._runOutcome.asReadonly();
+
+  /**
+   * Price direction per instrument, compared with the previous snapshot of the
+   * same run. Kept here rather than in the dashboard so the arrows survive
+   * leaving the page; a new run starts without any.
+   */
+  private readonly trendState = linkedSignal<
+    { readonly runId: number; readonly rows: readonly InstrumentMetrics[] },
+    TrendState
+  >({
+    source: () => ({ runId: this._runId(), rows: this._rows() }),
+    computation: ({ runId, rows }, previous) =>
+      nextTrends(previous?.source.runId === runId ? previous.value : NO_TRENDS, rows),
+  });
+  readonly trends = computed(() => this.trendState().trends);
 
   constructor() {
     this.replaceWorker();

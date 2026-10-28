@@ -6,6 +6,8 @@ import { WorkerEvent, WorkerStatus } from '../core/worker-protocol';
 /** Source of market updates; the Wasm `MarketGenerator` satisfies this. */
 export interface BatchGenerator {
   generateBatch(n: number): Int32Array;
+  /** Releases the generator's Wasm memory; it must not be used afterwards. */
+  free(): void;
 }
 
 export type GeneratorFactory = (seed: number, instrumentCount: number) => BatchGenerator;
@@ -76,6 +78,7 @@ export class ProducerEngine {
     const generator = this.deps.createGenerator(next.seed, next.instrumentCount);
 
     this.stopTimers();
+    this.releaseGenerator();
     this.runId = runId;
     this.settings = next;
     this.generator = generator;
@@ -110,7 +113,7 @@ export class ProducerEngine {
       return;
     }
     this.stopTimers();
-    this.generator = null;
+    this.releaseGenerator();
     this.setStatus('finished');
   }
 
@@ -160,6 +163,17 @@ export class ProducerEngine {
   private stopTimers(): void {
     this.cancelTimers?.();
     this.cancelTimers = null;
+  }
+
+  /** Frees the current generator now instead of waiting for garbage collection. */
+  private releaseGenerator(): void {
+    const generator = this.generator;
+    this.generator = null;
+    try {
+      generator?.free();
+    } catch {
+      // After a Wasm trap freeing can fail too; the generator is unusable either way.
+    }
   }
 
   private setStatus(status: WorkerStatus): void {

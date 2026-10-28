@@ -15,6 +15,7 @@ const fakeWasm: ProducerWasm = {
       }
       return out;
     },
+    free: () => undefined,
   }),
 };
 
