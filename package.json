@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "scripts": {
     "ng": "ng",
+    "dev": "bash scripts/dev.sh",
     "prestart": "npm run build:wasm",
     "start": "ng serve",
     "prebuild": "npm run build:wasm",

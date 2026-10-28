@@ -21,10 +21,13 @@ rustup target add wasm32-unknown-unknown
 ## Getting started
 
 ```bash
-nvm use
-npm ci
-npm start
+npm run dev
 ```
+
+`npm run dev` switches to the Node version in `.nvmrc` (installing it with nvm if needed), puts
+`cargo` on the PATH when rustup's directory is missing from it (Homebrew's rustup is keg-only),
+runs `npm ci` when `package-lock.json` changed since the last install, then runs `npm start`. The
+manual equivalent is `nvm use && npm ci && npm start`.
 
 `npm start` builds the Wasm package into `wasm/pkg` and serves the app at http://localhost:4200.
 Open **Settings** to change the instrument count, batch size and batch interval; **Apply** starts a
@@ -34,6 +37,7 @@ fresh run with them.
 
 | Command                                      | Purpose                                        |
 | -------------------------------------------- | ---------------------------------------------- |
+| `npm run dev`                                | Set up Node, Rust and deps, then `npm start`   |
 | `npm start`                                  | Dev server at http://localhost:4200            |
 | `npm run build`                              | Production build to `dist/findev/browser`      |
 | `npm test`                                   | Angular unit tests (Vitest), in watch mode     |
