@@ -162,6 +162,20 @@ describe('Dashboard', () => {
       expect(el.querySelectorAll('.visually-hidden')[1]?.textContent).toBe('rising');
     });
 
+    it('reuses the arrow element when a price changes direction', async () => {
+      const { producer, emit, snapshot, el } = setup();
+      producer.apply({ instrumentCount: 1 });
+      await emit({ type: 'status', status: 'running' }, snapshot([metrics(0, { lastPrice: 100 })]));
+      await emit(snapshot([metrics(0, { lastPrice: 101 })]));
+      const arrow = el.querySelector('.trend');
+
+      await emit(snapshot([metrics(0, { lastPrice: 99 })]));
+      expect(el.querySelector('.trend')).toBe(arrow);
+      expect(arrow?.className).toBe('trend trend--down');
+      expect(arrow?.textContent).toBe('▼');
+      expect(el.querySelectorAll('.visually-hidden')[1]?.textContent).toBe('falling');
+    });
+
     it('keeps each symbol in the same row element while values update', async () => {
       const { producer, emit, snapshot, bodyRows } = setup();
       producer.apply({ instrumentCount: 2 });

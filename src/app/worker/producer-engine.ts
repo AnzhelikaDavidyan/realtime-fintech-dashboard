@@ -25,7 +25,15 @@ export interface ProducerEngineDeps {
   readonly emit: (event: WorkerEvent) => void;
 }
 
-/** Snapshots go to the UI at most this often (about 10 per second). */
+/**
+ * Snapshots go to the UI at most this often (about 10 per second).
+ *
+ * Rendering a snapshot costs the main thread the same whatever the generation
+ * rate (about 3.5 ms for 50 instruments in a production build), so this
+ * interval alone sets the UI load: about 3.5% of the main thread at 100 ms, 7% at
+ * 50 ms. Faster updates are too quick to read, and 250 ms makes the table lag
+ * visibly behind the market.
+ */
 export const SNAPSHOT_INTERVAL_MS = 100;
 
 /**

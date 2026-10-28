@@ -101,12 +101,17 @@
           </th>
           <td class="num">
             <span class="price">
-              @if (row.trend === 'up') {
-                <span class="trend trend--up" aria-hidden="true">▲</span>
-                <span class="visually-hidden">rising</span>
-              } @else if (row.trend === 'down') {
-                <span class="trend trend--down" aria-hidden="true">▼</span>
-                <span class="visually-hidden">falling</span>
+              <!-- At full rate most arrows flip on every snapshot, so one view is
+                   kept and only its class and text change instead of being rebuilt. -->
+              @if (row.trend; as trend) {
+                <span
+                  class="trend"
+                  [class.trend--up]="trend === 'up'"
+                  [class.trend--down]="trend === 'down'"
+                  aria-hidden="true"
+                  >{{ trend === 'up' ? '▲' : '▼' }}</span
+                >
+                <span class="visually-hidden">{{ trend === 'up' ? 'rising' : 'falling' }}</span>
               }
               <app-value class="price__value" [text]="row.metrics.lastPrice | price" />
             </span>
