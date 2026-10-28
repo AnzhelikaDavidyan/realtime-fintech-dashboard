@@ -84,9 +84,11 @@ export class ProducerService {
   readonly runOutcome = this._runOutcome.asReadonly();
 
   /**
-   * Price direction per instrument, compared with the previous snapshot of the
-   * same run. Kept here rather than in the dashboard so the arrows survive
-   * leaving the page; a new run starts without any.
+   * Price direction per instrument, compared with the last snapshot shown in
+   * the same run. It is worked out only when read, so after time on another
+   * page the arrows show the move since the dashboard was last open. Kept here
+   * rather than in the dashboard so the arrows survive leaving the page; a new
+   * run starts without any.
    */
   private readonly trendState = linkedSignal<
     { readonly runId: number; readonly rows: readonly InstrumentMetrics[] },
