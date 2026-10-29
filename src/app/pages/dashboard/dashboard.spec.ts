@@ -130,6 +130,7 @@ describe('Dashboard', () => {
         '$101.87',
         '+0.20',
       ]);
+      // \u2212 is a real minus sign, not a hyphen.
       expect(cells(bodyRows()[1])[5]).toBe('\u22120.35');
       expect(stat('Trades this run')).toBe('56,000');
     });
@@ -154,6 +155,7 @@ describe('Dashboard', () => {
         { type: 'status', status: 'running' },
         snapshot([metrics(0, { lastPrice: 100 }), metrics(1, { lastPrice: 100 })]),
       );
+      // First snapshot: nothing to compare with yet, so no arrow.
       expect(el.querySelector('.trend')).toBeNull();
 
       await emit(snapshot([metrics(0, { lastPrice: 101 }), metrics(1, { lastPrice: 99 })]));
@@ -168,6 +170,7 @@ describe('Dashboard', () => {
       await emit({ type: 'status', status: 'running' }, snapshot([metrics(0, { lastPrice: 100 })]));
       await emit(snapshot([metrics(0, { lastPrice: 99 })]));
 
+      // A new component acts as coming back to the page; the arrows live in the service.
       const again = TestBed.createComponent(Dashboard);
       await again.whenStable();
       const arrow = (again.nativeElement as HTMLElement).querySelector('.trend');
@@ -182,6 +185,7 @@ describe('Dashboard', () => {
       const arrow = el.querySelector('.trend');
 
       await emit(snapshot([metrics(0, { lastPrice: 99 })]));
+      // toBe: the same DOM element, updated in place rather than re-created.
       expect(el.querySelector('.trend')).toBe(arrow);
       expect(arrow?.className).toBe('trend trend--down');
       expect(arrow?.textContent).toBe('▼');
@@ -194,6 +198,7 @@ describe('Dashboard', () => {
       await emit({ type: 'status', status: 'running' }, snapshot([metrics(0), metrics(1)]));
       const before = bodyRows();
       await emit(snapshot([metrics(0, { volume: 1 }), metrics(1, { volume: 2 })]));
+      // Same element objects (tracked by instrument), so rows update in place.
       expect(bodyRows()).toEqual(before);
     });
   });
@@ -252,6 +257,7 @@ describe('Dashboard', () => {
       expect(workers).toHaveLength(2);
       expect(workers[0].terminated).toBe(true);
       expect(text(banner())).toContain('Loading the Wasm generator');
+      // The focused Retry button disappears, so focus moves to the heading instead of being lost.
       expect(document.activeElement?.tagName).toBe('H1');
     });
 

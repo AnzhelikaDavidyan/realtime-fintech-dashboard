@@ -38,6 +38,7 @@ describe('errorMessage', () => {
   });
 
   it('reports the most basic problem first', () => {
+    // Several errors at once: the most basic one is shown.
     expect(errorMessage('instrumentCount', { integer: true, min: {} })).toBe(
       'Must be a whole number.',
     );
@@ -63,6 +64,7 @@ describe('matchesSettings', () => {
     expect(matchesSettings({ ...value, instrumentCount: 6 }, DEFAULT_PRODUCER_SETTINGS)).toBe(
       false,
     );
+    // An empty field (null) never matches.
     expect(matchesSettings({ ...value, instrumentCount: null }, DEFAULT_PRODUCER_SETTINGS)).toBe(
       false,
     );

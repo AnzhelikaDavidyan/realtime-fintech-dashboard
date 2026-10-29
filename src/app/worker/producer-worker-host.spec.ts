@@ -89,6 +89,7 @@ describe('ProducerWorkerHost', () => {
 
       wasm.resolve(fakeWasm);
       await host.loaded;
+      // Nothing is posted before Wasm loads; then ready comes first and the queued commands run.
       expect(messages()[0].type).toBe('ready');
       expect(ofType('status').map((s) => s.status)).toEqual(['running']);
     });
@@ -119,6 +120,7 @@ describe('ProducerWorkerHost', () => {
       time.advance(500);
       const last = ofType('snapshot').at(-1)!;
       expect(last.runId).toBe(9);
+      // 500 / 125 = 4 batches of 250.
       expect(last.totalUpdates).toBe(1_000);
       expect(decodeMetrics(last.metrics)).toHaveLength(4);
     });
@@ -126,6 +128,7 @@ describe('ProducerWorkerHost', () => {
     it('rejects unknown or malformed messages with a readable error', async () => {
       const { host, ofType } = setup();
       await host.loaded;
+      // Unknown type, start without runId, init without settings, not an object, null.
       for (const bad of [{ type: 'explode' }, { type: 'start' }, { type: 'init' }, 'start', null]) {
         host.receive(bad);
       }

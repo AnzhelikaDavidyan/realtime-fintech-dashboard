@@ -38,6 +38,7 @@ describe('App', () => {
     const router = TestBed.inject(Router);
     await router.navigateByUrl('/does-not-exist');
     await fixture.whenStable();
+    // The URL stays as typed: unknown paths render the not-found page, they do not redirect.
     expect(router.url).toBe('/does-not-exist');
     expect(fixture.nativeElement.querySelector('h1')?.textContent).toBe('Page not found');
   });

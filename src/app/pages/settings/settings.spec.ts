@@ -22,6 +22,7 @@ const INVALID_VALUES = EDITABLE_KEYS.flatMap((key) => {
   const { min, max } = PRODUCER_SETTINGS_LIMITS[key];
   return [
     { key, kind: 'empty', value: '', message: 'Required.' },
+    // min + 0.5 is inside the range, so only the whole-number rule fails.
     { key, kind: 'decimal', value: `${min + 0.5}`, message: 'Must be a whole number.' },
     { key, kind: 'below the minimum', value: `${min - 1}`, message: RANGE_MESSAGES[key] },
     { key, kind: 'above the maximum', value: `${max + 1}`, message: RANGE_MESSAGES[key] },
@@ -182,6 +183,7 @@ describe('Settings page', () => {
     it('does nothing while the form is invalid, even if submitted', async () => {
       const { type, producer, el, fixture } = setup();
       await type('instrumentCount', '0');
+      // Submitting the form directly skips the button, so the form itself must refuse.
       el.querySelector('form')!.dispatchEvent(new Event('submit'));
       await fixture.whenStable();
       expect(producer.runId()).toBe(1);
@@ -206,6 +208,7 @@ describe('Settings page', () => {
       expect(field('instrumentCount').value).toBe('5');
       expect(field('updatesPerBatch').value).toBe('100');
       expect(field('batchIntervalMs').value).toBe('500');
+      // Still run 2 (the apply above): Reset only fills the form. Apply is now available, as the defaults differ from the run.
       expect(producer.runId()).toBe(2);
       expect(
         (el.querySelector('button[type="submit"]') as HTMLButtonElement).getAttribute(
@@ -338,6 +341,7 @@ describe('Settings page', () => {
       await fixture.whenStable();
       apply().click();
       await fixture.whenStable();
+      // One init + one start: the second click found nothing to apply.
       expect(sent()).toHaveLength(2);
     });
   });

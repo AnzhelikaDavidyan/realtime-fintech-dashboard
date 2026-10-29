@@ -37,6 +37,7 @@ describe('metrics codec', () => {
   });
 
   it('round-trips values, including nulls and fractions', () => {
+    // null goes through NaN and back to null, while volume 0 must stay 0.
     expect(decodeMetrics(encodeMetrics([full, empty]))).toEqual([full, empty]);
   });
 
@@ -51,6 +52,7 @@ describe('metrics codec', () => {
   });
 
   it('rejects a buffer of the wrong length', () => {
+    // STRIDE + 1 numbers cannot be split into whole instruments.
     expect(() => decodeMetrics(new Float64Array(METRICS_STRIDE + 1))).toThrow(RangeError);
   });
 });

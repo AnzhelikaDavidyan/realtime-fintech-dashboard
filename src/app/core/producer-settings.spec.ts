@@ -63,6 +63,7 @@ describe('normalizeProducerSettings', () => {
       updatesPerBatch: updatesPerBatch.max,
       batchIntervalMs: batchIntervalMs.min,
     });
+    // The seed's minimum is 0, so a negative seed clamps to 0.
     expect(normalizeProducerSettings({ seed: -5 }).seed).toBe(0);
   });
 
@@ -76,6 +77,7 @@ describe('normalizeProducerSettings', () => {
   });
 
   it('falls back to the default for non-finite values', () => {
+    // Infinity falls back to the default; it is not clamped to the max.
     expect(
       normalizeProducerSettings({ seed: Number.NaN, instrumentCount: Number.POSITIVE_INFINITY }),
     ).toEqual(DEFAULT_PRODUCER_SETTINGS);

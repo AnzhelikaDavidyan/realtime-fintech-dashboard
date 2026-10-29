@@ -21,6 +21,7 @@ describe('loadProducerWasm', () => {
   it('explains a file that is not valid WebAssembly', async () => {
     const fetchFn = () =>
       Promise.resolve(
+        // A missing file often comes back as the app's index.html with status 200, so the status check is not enough.
         new Response('<!doctype html>', { status: 200, headers: { 'Content-Type': 'text/html' } }),
       );
     await expect(loadProducerWasm(url, fetchFn as typeof fetch)).rejects.toThrow(

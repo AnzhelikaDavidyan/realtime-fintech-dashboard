@@ -24,6 +24,7 @@ describe('ImbalanceBar', () => {
   it('grows right in green for buying pressure (design: +0.20 → 9px from the centre)', () => {
     const { fill } = render(0.2);
     expect(fill?.classList).toContain('fill--buy');
+    // Half the bar is 45px: it starts at the centre (45px) and 0.2 × 45 = 9px wide.
     expect(fill?.style.left).toBe('45px');
     expect(fill?.style.width).toBe('9px');
   });
@@ -37,6 +38,7 @@ describe('ImbalanceBar', () => {
 
   it('reaches the edge at ±1 and never beyond', () => {
     expect(render(1).fill?.style.width).toBe('45px');
+    // -3 is clamped to -1: the whole left half.
     expect(render(-3).fill?.style.left).toBe('0px');
   });
 

@@ -54,6 +54,7 @@ describe('Notifications', () => {
     vi.advanceTimersByTime(60_000);
     expect(titles()).toEqual(['Saved']);
 
+    // Released: a full new countdown, not the 1 ms that was left.
     notifications.release(id);
     vi.advanceTimersByTime(TOAST_AUTO_DISMISS_MS - 1);
     expect(titles()).toEqual(['Saved']);
@@ -65,6 +66,7 @@ describe('Notifications', () => {
     notifications.show({ ...success, group: 'apply' });
     vi.advanceTimersByTime(TOAST_AUTO_DISMISS_MS - 1);
     notifications.show({ ...failure, group: 'apply' });
+    // The first toast's timer fires during this wait; it must not remove the replacement.
     vi.advanceTimersByTime(TOAST_AUTO_DISMISS_MS);
     expect(titles()).toEqual(['Failed']);
   });

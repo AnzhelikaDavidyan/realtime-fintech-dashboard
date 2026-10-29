@@ -47,6 +47,7 @@ describe('SettingsApply', () => {
   it('does not wait any longer when the run takes longer than the minimum to start', () => {
     const { service, worker, wait } = setup();
     service.apply(edited);
+    // Time alone never ends applying; only the worker's 'running' does.
     wait(MIN_APPLYING_MS * 3);
     expect(service.applying()).toBe(true);
 
@@ -122,6 +123,7 @@ describe('SettingsApply', () => {
     worker().crash('Script error');
     wait(MIN_APPLYING_MS);
 
+    // runId 3: the failed Apply used run 2.
     notifications.toasts()[0].action!.run();
     expect(workers).toHaveLength(2);
     expect(worker().sent).toEqual([
@@ -152,6 +154,7 @@ describe('SettingsApply', () => {
   it('ignores Apply while a run is still starting', () => {
     const { service, worker } = setup();
     service.apply(edited);
+    // The second Apply is ignored while run 2 is starting, so only one init and start are sent.
     service.apply({ ...edited, instrumentCount: 7 });
     expect(worker().sent.slice(2)).toEqual([
       { type: 'init', settings: edited },
@@ -166,6 +169,7 @@ describe('SettingsApply', () => {
     worker().emit({ type: 'status', status: 'running' });
     wait(MIN_APPLYING_MS);
 
+    // The run that started is not the one Apply asked for, so there's no toast.
     expect(service.applying()).toBe(false);
     expect(toasts()).toEqual([]);
   });

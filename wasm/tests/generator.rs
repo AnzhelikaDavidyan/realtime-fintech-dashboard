@@ -105,6 +105,7 @@ fn prices_evolve_from_the_previous_value() {
         last.iter().all(Option::is_some),
         "every instrument must update"
     );
+    // Stepping by at most MAX_STEP is also true of a price that never moves.
     assert!(
         moved > updates.len() / 2,
         "prices should actually move, moved {moved}"
@@ -116,6 +117,7 @@ fn state_persists_between_calls() {
     // Many small calls produce exactly the same stream as one large call.
     let mut chunked = generator(99, 6);
     let mut stream = Vec::new();
+    // 1 + 10 + 250 + 3 + 736 = 1,000.
     for n in [1, 10, 250, 3, 736] {
         stream.extend(chunked.generate_batch(n));
     }

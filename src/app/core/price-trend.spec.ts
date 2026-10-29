@@ -15,6 +15,7 @@ const row = (instrument: number, lastPrice: number | null): InstrumentMetrics =>
 });
 
 function run(...snapshots: InstrumentMetrics[][]): TrendState {
+  // Feeds the snapshots in order, as the service does over time.
   return snapshots.reduce(nextTrends, NO_TRENDS);
 }
 
@@ -45,6 +46,7 @@ describe('nextTrends', () => {
   });
 
   it('starts over when the rows are cleared for a new run', () => {
+    // The empty snapshot forgets every price, so 90 has nothing to compare with.
     const state = run([row(0, 100)], [row(0, 101)], [], [row(0, 90)]);
     expect(state.trends.get(0)).toBeUndefined();
   });

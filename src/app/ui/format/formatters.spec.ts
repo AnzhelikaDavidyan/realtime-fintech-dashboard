@@ -14,6 +14,7 @@ describe('formatPrice', () => {
   });
 
   it('rounds fractional cents, e.g. a VWAP, to whole cents', () => {
+    // A VWAP can be a fraction of a cent.
     expect(formatPrice(10_150.4)).toBe('$101.50');
     expect(formatPrice(10_150.6)).toBe('$101.51');
   });
@@ -36,6 +37,7 @@ describe('formatImbalance', () => {
     [-0.35, `${MINUS}0.35`],
     [1, '+1.00'],
     [-1, `${MINUS}1.00`],
+    // Halves round away from zero in both directions.
     [0.125, '+0.13'],
     [-0.125, `${MINUS}0.13`],
   ])('formats %d as %s', (imbalance, expected) => {
@@ -50,6 +52,7 @@ describe('formatImbalance', () => {
     expect(formatImbalance(0)).toBe('0.00');
     expect(formatImbalance(0.004)).toBe('0.00');
     expect(formatImbalance(-0.004)).toBe('0.00');
+    // Negative zero must not print with a minus sign.
     expect(formatImbalance(-0)).toBe('0.00');
   });
 });

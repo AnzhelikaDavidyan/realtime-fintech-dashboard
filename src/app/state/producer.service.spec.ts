@@ -120,12 +120,15 @@ describe('ProducerService', () => {
     it('follows the current run and resets for a new one', () => {
       const { service, worker } = setup();
       expect(service.totalUpdates()).toBe(0);
+      // Any number unlike rows.length, to show the count comes from the event.
       worker().emit({ ...snapshot(1, [row(0, 5)]), totalUpdates: 1_200 } as WorkerEvent);
       expect(service.totalUpdates()).toBe(1_200);
 
+      // A new run (runId 2) resets the count.
       service.apply({ instrumentCount: 1 });
       expect(service.totalUpdates()).toBe(0);
 
+      // A late snapshot from run 1 is ignored, so it cannot overwrite the reset count.
       worker().emit({ ...snapshot(1, [row(0, 5)]), totalUpdates: 9_999 } as WorkerEvent);
       expect(service.totalUpdates()).toBe(0);
     });
@@ -204,6 +207,7 @@ describe('ProducerService', () => {
       service.apply({ instrumentCount: 1 });
       service.apply({ instrumentCount: 1 });
 
+      // Run 99 is rejected too: only an exact match with the current run counts.
       for (const runId of [1, 2, 3, 99]) {
         worker().emit(snapshot(runId, [row(0, runId)]));
       }
@@ -233,6 +237,7 @@ describe('ProducerService', () => {
     it('shows a failed command without changing the status', () => {
       const { service, worker } = setup();
       worker().emit({ type: 'status', status: 'running' });
+      // The run already started, so a failed command only shows its message.
       worker().emit({ type: 'error', message: 'bad settings', command: 'start' });
       expect(service.status()).toBe('running');
       expect(service.error()).toBe('bad settings');
@@ -251,6 +256,7 @@ describe('ProducerService', () => {
     it('keeps the load failure message when queued commands then fail too', () => {
       const { service, worker } = setup();
       worker().emit({ type: 'error', message: 'Could not download the market engine' });
+      // Already unusable, so this repeat of the cause does not replace the first message.
       worker().emit({
         type: 'error',
         message: 'The market engine is unavailable: Could not download the market engine',

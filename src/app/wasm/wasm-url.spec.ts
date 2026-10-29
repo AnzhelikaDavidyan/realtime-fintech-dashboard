@@ -11,6 +11,7 @@ describe('producerWasmUrl', () => {
   });
 
   it('resolves against a worker script URL the same way', () => {
+    // A relative URL replaces the last path segment, so the worker file name drops out.
     const url = producerWasmUrl(
       'https://example.test/realtime-fintech-dashboard/worker-ABC.js',
       'abc123',

@@ -84,6 +84,7 @@ describe('ProducerEngine', () => {
 
     it('waits a full interval before the first batch', () => {
       const { engine, time } = setup();
+      // Intervals fire at the end of each period, not at time 0.
       engine.start(1, { ...settings, batchIntervalMs: 500 });
       time.advance(499);
       expect(engine.totalUpdates).toBe(0);
@@ -108,6 +109,7 @@ describe('ProducerEngine', () => {
       expect(time.activeTimers).toBe(2);
       time.advance(200);
       expect(snapshots().at(-1)!.runId).toBe(1);
+      // 4 batches of 10: run 1 kept going after the failed switch.
       expect(engine.totalUpdates).toBe(40);
     });
   });
@@ -115,6 +117,7 @@ describe('ProducerEngine', () => {
   describe('snapshots', () => {
     it('are sent at most every 100 ms (about 10 per second) with fast batches', () => {
       const { engine, time, snapshots } = setup();
+      // 20 batches a second (200 updates), but still only 10 snapshots.
       engine.start(1, { ...settings, batchIntervalMs: 50 });
       time.advance(1_000);
       expect(snapshots()).toHaveLength(1_000 / SNAPSHOT_INTERVAL_MS);
@@ -125,6 +128,7 @@ describe('ProducerEngine', () => {
       const { engine, time, snapshots } = setup();
       engine.start(1, { ...settings, batchIntervalMs: 500 });
       time.advance(1_000);
+      // Batches land at 500 and 1000 ms only, so 8 of the 10 snapshot ticks have nothing new.
       expect(snapshots()).toHaveLength(2);
     });
 
@@ -230,10 +234,12 @@ describe('ProducerEngine', () => {
         engine.start(1, settings);
         failNext();
         expect(() => engine.start(2, settings)).toThrow('bad settings');
+        // A failed start must not free the running generator.
         expect(generators[0].generator.freed).toBe(0);
 
         engine.start(3, settings);
         expect(generators[0].generator.freed).toBe(1);
+        // generators[1] is run 3's: the failed run never created one.
         expect(generators[1].generator.freed).toBe(0);
       });
 
@@ -242,6 +248,7 @@ describe('ProducerEngine', () => {
         engine.start(1, settings);
         engine.start(2, { ...settings, updatesPerBatch: 7, batchIntervalMs: 250 });
         time.advance(1_000);
+        // 1000 / 250 = 4 batches; run 1 was replaced at time 0, before its first batch.
         expect(generators[1].generator.requested).toEqual([7, 7, 7, 7]);
       });
 
@@ -253,6 +260,7 @@ describe('ProducerEngine', () => {
         engine.start(2, settings);
         time.advance(100);
 
+        // 10, not 40 + 10: the new run starts from zero, even from pause.
         expect(engine.status).toBe('running');
         expect(engine.totalUpdates).toBe(10);
       });
@@ -283,6 +291,7 @@ describe('ProducerEngine', () => {
         }
         time.advance(500);
 
+        // Every snapshot after a switch belongs to that run or a later one: run ids never go back.
         for (const [runId, from] of switches) {
           expect(
             snapshots()
@@ -304,6 +313,7 @@ describe('ProducerEngine', () => {
       engine.resume();
       engine.pause();
       engine.pause();
+      // Resume while running and a second pause change nothing, so no extra statuses.
       expect(statuses()).toEqual(['running', 'paused']);
       expect(time.activeTimers).toBe(0);
     });

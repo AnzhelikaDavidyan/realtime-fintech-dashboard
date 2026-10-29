@@ -13,6 +13,7 @@ function batch(...updates: Update[]): Int32Array {
       u.ask ?? 101,
       u.bidQty ?? 10,
       u.askQty ?? 20,
+      // Trades at the ask unless given, so a partial update is still a valid trade.
       u.tradePrice ?? u.ask ?? 101,
       u.tradeQty ?? 0,
     ]),
@@ -38,6 +39,7 @@ describe('MetricsAggregator', () => {
   describe('worked example', () => {
     // 1. Quote $101.00 / $101.04; a seller hits the bid: 20 @ $101.00.
     // 2. Quote $101.96 / $102.00 with 60 bid vs 40 ask; a buyer lifts the ask: 20 @ $102.00.
+    // Built once for the whole describe; the tests below only read it.
     const agg = new MetricsAggregator(1);
     agg.ingest(
       batch(
@@ -82,6 +84,7 @@ describe('MetricsAggregator', () => {
 
     it('has imbalance 0.20', () => {
       // (60 − 40) / (60 + 40)
+      // Imbalance is a float, so compare with a tolerance.
       expect(m.imbalance).toBeCloseTo(0.2, 10);
     });
   });
@@ -124,6 +127,7 @@ describe('MetricsAggregator', () => {
 
     it('handles a one-sided book', () => {
       const agg = new MetricsAggregator(1);
+      // All quantity on one side gives the extremes: +1 (only buyers) and -1 (only sellers).
       agg.ingest(batch({ instrument: 0, bidQty: 30, askQty: 0 }));
       expect(agg.metrics(0).imbalance).toBe(1);
       agg.ingest(batch({ instrument: 0, bidQty: 0, askQty: 30 }));
@@ -236,6 +240,7 @@ describe('MetricsAggregator', () => {
   describe('invalid input', () => {
     it('rejects malformed batches and unknown instruments', () => {
       const agg = new MetricsAggregator(2);
+      // 6 numbers is not a whole update (stride 7); instrument 2 is outside 0..1.
       expect(() => agg.ingest(new Int32Array(6))).toThrow(RangeError);
       expect(() => agg.ingest(batch({ instrument: 2 }))).toThrow(/outside 0\.\.1/);
       expect(() => agg.ingest(batch({ instrument: -1 }))).toThrow(RangeError);

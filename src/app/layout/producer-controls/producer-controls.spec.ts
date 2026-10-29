@@ -69,6 +69,7 @@ describe('ProducerControls', () => {
 
   it('treats a run that ended as an error with Retry', async () => {
     const { emit, status, button, text } = setup();
+    // Runs only finish on their own after a failure (e.g. Wasm trapped), so it shows as an error.
     await emit({ type: 'status', status: 'finished' });
     expect(text(status())).toBe('Error');
     expect(text(button())).toBe('↻ Retry');
