@@ -2,16 +2,13 @@ import { Component, computed, inject, LOCALE_ID } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormGroup, ReactiveFormsModule } from '@angular/forms';
 
-import {
-  DEFAULT_PRODUCER_SETTINGS,
-  nominalRate,
-  PRODUCER_SETTINGS_LIMITS,
-} from '../../core/producer-settings';
+import { DEFAULT_PRODUCER_SETTINGS, nominalRate } from '../../core/producer-settings';
 import { ProducerService } from '../../state/producer.service';
 import { formatVolume } from '../../ui/format/formatters';
-import { Tooltip } from '../../ui/tooltip/tooltip';
+import { SettingsActions } from './settings-actions/settings-actions';
 import { SettingsApply } from './settings-apply';
 import {
+  ApplyState,
   describeRun,
   EDITABLE_KEYS,
   EditableKey,
@@ -21,6 +18,7 @@ import {
   settingControl,
   SettingsFormValue,
 } from './settings-form';
+import { SettingsHelp } from './settings-help/settings-help';
 
 interface FieldView {
   readonly key: EditableKey;
@@ -31,7 +29,7 @@ interface FieldView {
 
 @Component({
   selector: 'app-settings',
-  imports: [ReactiveFormsModule, Tooltip],
+  imports: [ReactiveFormsModule, SettingsActions, SettingsHelp],
   templateUrl: './settings.html',
   styleUrl: './settings.scss',
 })
@@ -105,16 +103,11 @@ export class Settings {
     return Object.fromEntries(entries) as Record<EditableKey, boolean>;
   });
 
-  protected readonly matchesActive = computed(() => matchesSettings(this.value(), this.active()));
-  /** Also false while applying: the active settings already match the form then. */
-  protected readonly canApply = computed(() => this.valid() && !this.matchesActive());
-
-  /** Why Apply is (or isn't) available, shown when hovering or focusing it. */
-  protected readonly applyTooltip = computed(() => {
-    if (this.applying()) return 'Starting the new run…';
-    if (!this.valid()) return 'Fix the highlighted fields to apply.';
-    if (this.matchesActive()) return 'Nothing to apply yet. Change a value to enable Apply.';
-    return 'Restarts the producer with these settings. All totals reset to zero.';
+  /** Drives the actions row: its note, the Apply tooltip and whether Apply is available. */
+  protected readonly applyState = computed<ApplyState>(() => {
+    if (this.applying()) return 'applying';
+    if (!this.valid()) return 'invalid';
+    return matchesSettings(this.value(), this.active()) ? 'unchanged' : 'ready';
   });
 
   /** "200 updates / second … (100 × 1000 / 500)", or null while a field is invalid. */
@@ -132,33 +125,13 @@ export class Settings {
     };
   });
 
-  protected readonly note = computed(() => {
-    if (this.applying()) {
-      return 'Applying settings: starting a new run…';
-    }
-    if (!this.valid()) {
-      return 'Apply is disabled until every field is valid. The running producer is not affected.';
-    }
-    return this.matchesActive()
-      ? 'Form matches the active run — nothing to apply yet.'
-      : 'Apply resets all totals and starts a new run (it also resumes if paused).';
-  });
-
   /** "Run #3 · 5 instruments · 100 updates every 500 ms". */
   protected readonly activeRun = computed(() =>
     describeRun(this.runId(), this.active(), this.locale),
   );
 
-  protected readonly allowedValues = (() => {
-    const r = (key: EditableKey) => {
-      const { min, max } = PRODUCER_SETTINGS_LIMITS[key];
-      return `${formatVolume(min, { locale: this.locale })}–${formatVolume(max, { locale: this.locale })}`;
-    };
-    return `Whole numbers only. Instruments ${r('instrumentCount')} · Updates ${r('updatesPerBatch')} · Interval ${r('batchIntervalMs')} ms`;
-  })();
-
   protected apply(): void {
-    if (!this.canApply()) return;
+    if (this.applyState() !== 'ready') return;
     const { instrumentCount, updatesPerBatch, batchIntervalMs } = this.form.getRawValue();
     this.applyService.apply({
       ...this.active(),

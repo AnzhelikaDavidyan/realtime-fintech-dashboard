@@ -1,0 +1,47 @@
+@use 'abstracts' as *;
+
+/* A flex item of the page's content row: takes the space the form leaves. */
+:host {
+  display: block;
+  flex: 1;
+  min-width: 0;
+}
+
+.help {
+  @include stack(12px);
+
+  font-size: var(--font-sm);
+}
+
+.help__item {
+  @include card;
+  @include stack(6px);
+
+  padding: 16px;
+
+  h2 {
+    margin: 0;
+    font-size: var(--font-sm);
+    font-weight: 600;
+  }
+
+  p {
+    margin: 0;
+    color: var(--text-muted);
+  }
+
+  &--fresh {
+    animation: fresh 2s ease-out;
+
+    @include reduced-motion {
+      animation: none;
+    }
+  }
+}
+
+@keyframes fresh {
+  from {
+    border-color: var(--up-strong);
+    background: var(--success-soft);
+  }
+}

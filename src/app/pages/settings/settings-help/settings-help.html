@@ -1,0 +1,17 @@
+<aside class="help" aria-label="About these settings">
+  <section class="help__item" [class.help__item--fresh]="justApplied()">
+    <h2>Active run</h2>
+    <p>{{ activeRun() }}</p>
+  </section>
+  <section class="help__item">
+    <h2>What Apply does</h2>
+    <p>
+      Starts a new run with these settings, clears all prices, volumes and VWAP, and starts
+      generating even if the dashboard was paused.
+    </p>
+  </section>
+  <section class="help__item">
+    <h2>Allowed values</h2>
+    <p>{{ allowedValues }}</p>
+  </section>
+</aside>

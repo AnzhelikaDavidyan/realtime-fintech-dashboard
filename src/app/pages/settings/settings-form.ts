@@ -48,10 +48,15 @@ export function errorMessage(
   return 'Invalid value.';
 }
 
+/** Allowed values of a setting, e.g. "1–50" or "50–2,000". */
+export function limitsText(key: EditableKey, locale?: string): string {
+  const { min, max } = PRODUCER_SETTINGS_LIMITS[key];
+  return `${formatVolume(min, { locale })}–${formatVolume(max, { locale })}`;
+}
+
 /** Range shown inside each input, e.g. "1–50" or "ms · 50–2,000". */
 export function rangeText(key: EditableKey, locale?: string): string {
-  const { min, max } = PRODUCER_SETTINGS_LIMITS[key];
-  const range = `${formatVolume(min, { locale })}–${formatVolume(max, { locale })}`;
+  const range = limitsText(key, locale);
   return key === 'batchIntervalMs' ? `ms · ${range}` : range;
 }
 
@@ -67,3 +72,9 @@ export function describeRun(runId: number, settings: ProducerSettings, locale?: 
   const noun = instrumentCount === 1 ? 'instrument' : 'instruments';
   return `Run #${runId} · ${n(instrumentCount)} ${noun} · ${n(updatesPerBatch)} updates every ${n(batchIntervalMs)} ms`;
 }
+
+/**
+ * Whether Apply can run, and if not, why: a new run is starting, a field is
+ * invalid, or the form still matches the active run.
+ */
+export type ApplyState = 'applying' | 'invalid' | 'unchanged' | 'ready';

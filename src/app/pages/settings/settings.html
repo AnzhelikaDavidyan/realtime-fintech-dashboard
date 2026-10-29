@@ -5,7 +5,7 @@
 
 <div class="content">
   <form
-    class="card form"
+    class="form"
     [formGroup]="form"
     (ngSubmit)="apply()"
     novalidate
@@ -63,49 +63,8 @@
     </fieldset>
 
     <!-- Outside the fieldset: disabling the focused Apply button would drop keyboard focus. -->
-    <div class="actions">
-      <p class="actions__note" aria-live="polite">{{ note() }}</p>
-      <div class="actions__buttons">
-        <button type="button" class="button" [disabled]="applying()" (click)="resetToDefaults()">
-          Reset to defaults
-        </button>
-        <!-- aria-disabled instead of disabled: a disabled button gets no hover or
-             focus, so its tooltip could never explain why it is unavailable. -->
-        <app-tooltip tooltipId="apply-tooltip" [text]="applyTooltip()">
-          <button
-            type="submit"
-            class="button button--primary"
-            [class.button--busy]="applying()"
-            [attr.aria-disabled]="!canApply()"
-            aria-describedby="apply-tooltip"
-          >
-            @if (applying()) {
-              <span class="spinner" aria-hidden="true"></span>
-              Applying…
-            } @else {
-              Apply
-            }
-          </button>
-        </app-tooltip>
-      </div>
-    </div>
+    <app-settings-actions [state]="applyState()" (restoreDefaults)="resetToDefaults()" />
   </form>
 
-  <aside class="help" aria-label="About these settings">
-    <section class="card help__item" [class.help__item--fresh]="justApplied()">
-      <h2>Active run</h2>
-      <p>{{ activeRun() }}</p>
-    </section>
-    <section class="card help__item">
-      <h2>What Apply does</h2>
-      <p>
-        Starts a new run with these settings, clears all prices, volumes and VWAP, and starts
-        generating even if the dashboard was paused.
-      </p>
-    </section>
-    <section class="card help__item">
-      <h2>Allowed values</h2>
-      <p>{{ allowedValues }}</p>
-    </section>
-  </aside>
+  <app-settings-help [activeRun]="activeRun()" [justApplied]="justApplied()" />
 </div>

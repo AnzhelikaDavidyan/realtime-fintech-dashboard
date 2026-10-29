@@ -1,5 +1,11 @@
 import { DEFAULT_PRODUCER_SETTINGS } from '../../core/producer-settings';
-import { errorMessage, matchesSettings, rangeText, settingControl } from './settings-form';
+import {
+  errorMessage,
+  limitsText,
+  matchesSettings,
+  rangeText,
+  settingControl,
+} from './settings-form';
 
 describe('settingControl validators', () => {
   const errorsFor = (key: Parameters<typeof settingControl>[0], value: number | null) => {
@@ -46,6 +52,13 @@ describe('errorMessage', () => {
 
   it('is null for a valid value', () => {
     expect(errorMessage('instrumentCount', null)).toBeNull();
+  });
+});
+
+describe('limitsText', () => {
+  it('formats the allowed range without a unit', () => {
+    expect(limitsText('batchIntervalMs')).toBe('50–2,000');
+    expect(limitsText('updatesPerBatch', 'de-DE')).toBe('1–1.000');
   });
 });
 
