@@ -21,25 +21,25 @@ function render(value: number | null) {
 }
 
 describe('ImbalanceBar', () => {
-  it('grows right in green for buying pressure (design: +0.20 → 9px from the centre)', () => {
+  it('grows right in green for buying pressure (design: +0.20 → 9px of 90px from the centre)', () => {
     const { fill } = render(0.2);
     expect(fill?.classList).toContain('fill--buy');
-    // Half the bar is 45px: it starts at the centre (45px) and 0.2 × 45 = 9px wide.
-    expect(fill?.style.left).toBe('45px');
-    expect(fill?.style.width).toBe('9px');
+    // Half the bar is 50%: it starts at the centre and 0.2 × 50% = 10% wide.
+    expect(fill?.style.left).toBe('50%');
+    expect(fill?.style.width).toBe('10%');
   });
 
   it('grows left in red for selling pressure', () => {
     const { fill } = render(-0.4);
     expect(fill?.classList).toContain('fill--sell');
-    expect(fill?.style.left).toBe('27px');
-    expect(fill?.style.width).toBe('18px');
+    expect(fill?.style.left).toBe('30%');
+    expect(fill?.style.width).toBe('20%');
   });
 
   it('reaches the edge at ±1 and never beyond', () => {
-    expect(render(1).fill?.style.width).toBe('45px');
+    expect(render(1).fill?.style.width).toBe('50%');
     // -3 is clamped to -1: the whole left half.
-    expect(render(-3).fill?.style.left).toBe('0px');
+    expect(render(-3).fill?.style.left).toBe('0%');
   });
 
   it('shows no fill for zero or no data', () => {

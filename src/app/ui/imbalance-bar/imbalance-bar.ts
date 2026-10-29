@@ -1,8 +1,7 @@
 import { Component, computed, input } from '@angular/core';
 
-/** Width of the bar in px; the centre line marks zero. */
-const WIDTH = 90;
-const HALF = WIDTH / 2;
+/** Half the bar in percent of its width; the centre line marks zero. The width itself is set in CSS. */
+const HALF = 50;
 
 /**
  * Horizontal bar for an order-book imbalance from −1 to +1: grows right in
@@ -19,8 +18,8 @@ const HALF = WIDTH / 2;
         class="fill"
         [class.fill--buy]="fill.side === 'buy'"
         [class.fill--sell]="fill.side === 'sell'"
-        [style.left.px]="fill.left"
-        [style.width.px]="fill.width"
+        [style.left.%]="fill.left"
+        [style.width.%]="fill.width"
       ></span>
     }
     <span class="center"></span>

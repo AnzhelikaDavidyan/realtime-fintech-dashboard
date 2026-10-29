@@ -2,7 +2,8 @@
   position: relative;
   display: inline-block;
   flex: none;
-  width: 90px;
+  /* The parent can resize the bar with --imbalance-bar-width; the fill is laid out in percent. */
+  width: var(--imbalance-bar-width, 90px);
   height: 12px;
 }
 
@@ -15,8 +16,7 @@
 }
 
 .track {
-  left: 0;
-  width: 90px;
+  inset-inline: 0;
   background: var(--bar-track);
 }
 
@@ -31,8 +31,8 @@
 .center {
   position: absolute;
   top: 0;
-  left: 44px;
+  left: calc(50% - 1px);
   width: 2px;
-  height: 12px;
+  height: 100%;
   background: var(--bar-center);
 }

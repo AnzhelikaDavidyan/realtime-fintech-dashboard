@@ -1,3 +1,5 @@
+@use 'abstracts' as *;
+
 /* Design tokens from the Figma file "Findev — Realtime Fintech Dashboard (UX)". The design is dark only. */
 :root {
   color-scheme: dark;
@@ -49,9 +51,46 @@
   --button-border: #2a3446;
   --button-on-warning: #111111;
 
+  /* Brand */
+  --brand-gradient: linear-gradient(to right, var(--info), var(--up-strong));
+
+  /* Type scale */
+  --font-2xs: 11px;
+  --font-xs: 12px;
+  --font-sm: 13px;
+  --font-md: 14px;
+  --font-lg: 16px;
+  --font-xl: 20px;
+  --font-title: 22px;
+
+  /* Radii */
   --radius-sm: 7px;
   --radius-md: 9px;
   --radius-lg: 12px;
+  --radius-xl: 14px;
+  --radius-pill: 999px;
+
+  /* Elevation */
+  --shadow-overlay: 0 12px 32px rgb(0 0 0 / 40%);
+  --z-tooltip: 1;
+  --z-toast: 10;
+
+  /* Motion */
+  --duration-fast: 120ms;
+  --duration-base: 180ms;
+
+  /* Layout: these change with the breakpoints below, so components rarely need media queries. */
+  --header-height: 64px;
+  --page-gutter: 28px;
+  --page-gap: 18px;
+  --card-padding: 26px;
+
+  @include media-down(md) {
+    --page-gutter: 16px;
+    --page-gap: 14px;
+    --card-padding: 18px;
+    --font-title: 20px;
+  }
 }
 
 *,
@@ -62,15 +101,12 @@
 
 /* Hidden on screen but still read by screen readers. */
 .visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  padding: 0;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-  border: 0;
+  @include visually-hidden;
+}
+
+html {
+  /* Keep text at the set size when a phone rotates to landscape. */
+  text-size-adjust: 100%;
 }
 
 html,
@@ -90,6 +126,5 @@ body {
 
 /* Keyboard focus, visible on the dark theme. */
 :focus-visible {
-  outline: 2px solid var(--info);
-  outline-offset: 2px;
+  @include focus-ring;
 }

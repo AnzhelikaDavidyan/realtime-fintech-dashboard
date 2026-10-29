@@ -36,6 +36,9 @@
               }
             ],
             "styles": ["@fontsource-variable/inter/index.css", "src/styles.scss"],
+            "stylePreprocessorOptions": {
+              "includePaths": ["src/styles"]
+            },
             "webWorkerTsConfig": "tsconfig.worker.json"
           },
           "configurations": {

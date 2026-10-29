@@ -1,17 +1,28 @@
+@use 'abstracts' as *;
+
 p {
   margin: 0;
 }
 
 .toasts {
+  @include stack(10px);
+
   position: fixed;
-  z-index: 10;
-  top: 76px;
+  z-index: var(--z-toast);
+  top: calc(var(--header-height) + 12px);
   right: 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  width: min(380px, calc(100vw - 32px));
+  width: min(380px, calc(100vw - 2 * var(--page-gutter)));
   pointer-events: none;
+
+  /* The header wraps to two rows here, so toasts dock to the bottom, full width. */
+  @include media-down(md) {
+    top: auto;
+    right: var(--page-gutter);
+    bottom: calc(var(--page-gutter) + env(safe-area-inset-bottom, 0px));
+    left: var(--page-gutter);
+    width: auto;
+    --toast-enter-offset: 6px;
+  }
 }
 
 .toast {
@@ -23,10 +34,14 @@ p {
   border-left-width: 3px;
   border-radius: var(--radius-lg);
   background: var(--surface-raised);
-  box-shadow: 0 12px 32px rgb(0 0 0 / 40%);
-  font-size: 13px;
+  box-shadow: var(--shadow-overlay);
+  font-size: var(--font-sm);
   pointer-events: auto;
-  animation: toast-in 180ms ease-out;
+  animation: toast-in var(--duration-base) ease-out;
+
+  @include reduced-motion {
+    animation: none;
+  }
 
   &--success {
     border-left-color: var(--up-strong);
@@ -43,10 +58,9 @@ p {
 }
 
 .toast__body {
-  display: flex;
+  @include stack(4px);
+
   flex: 1;
-  flex-direction: column;
-  gap: 4px;
   min-width: 0;
 }
 
@@ -67,14 +81,11 @@ p {
 }
 
 .toast__button {
+  @include button;
+
   padding: 5px 12px;
-  border: 1px solid var(--button-border);
   border-radius: var(--radius-sm);
-  background: var(--button-bg);
-  color: var(--text);
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
+  font-size: inherit;
 }
 
 .toast__link {
@@ -95,7 +106,7 @@ p {
   line-height: 1;
   cursor: pointer;
 
-  &:hover {
+  @include hover {
     color: var(--text);
   }
 }
@@ -103,12 +114,6 @@ p {
 @keyframes toast-in {
   from {
     opacity: 0;
-    transform: translateY(-6px);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .toast {
-    animation: none;
+    transform: translateY(var(--toast-enter-offset, -6px));
   }
 }

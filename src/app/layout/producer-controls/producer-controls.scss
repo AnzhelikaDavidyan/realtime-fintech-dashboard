@@ -1,3 +1,5 @@
+@use 'abstracts' as *;
+
 :host {
   display: flex;
   align-items: center;
@@ -9,8 +11,8 @@
   align-items: center;
   gap: 8px;
   padding: 6px 12px;
-  border-radius: 999px;
-  font-size: 13px;
+  border-radius: var(--radius-pill);
+  font-size: var(--font-sm);
   font-weight: 600;
   white-space: nowrap;
 
@@ -41,30 +43,13 @@
 }
 
 .action {
-  padding: 9px 16px;
-  border: 1px solid var(--button-border);
-  border-radius: var(--radius-md);
-  background: var(--button-bg);
-  color: var(--text);
-  font: inherit;
-  font-size: 14px;
-  font-weight: 600;
-  white-space: nowrap;
-  cursor: pointer;
-
-  &:hover {
-    filter: brightness(1.15);
-  }
+  @include button;
 
   &--resume {
-    border-color: var(--warning);
-    background: var(--warning);
-    color: var(--button-on-warning);
+    @include button-fill(var(--warning), var(--button-on-warning));
   }
 
   &--retry {
-    border-color: var(--info);
-    background: var(--info);
-    color: var(--text-strong);
+    @include button-fill(var(--info), var(--text-strong));
   }
 }

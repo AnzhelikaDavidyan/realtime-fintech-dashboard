@@ -1,0 +1,90 @@
+/* Shared style patterns. Mixins emit nothing until included, so `@use` costs no CSS. */
+
+/* Hidden on screen but still read by screen readers. */
+@mixin visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@mixin focus-ring {
+  outline: 2px solid var(--info);
+  outline-offset: 2px;
+}
+
+/* Hover only where a pointer can hover, so taps don't leave a stuck hover state. */
+@mixin hover {
+  @media (hover: hover) {
+    &:hover {
+      @content;
+    }
+  }
+}
+
+@mixin reduced-motion {
+  @media (prefers-reduced-motion: reduce) {
+    @content;
+  }
+}
+
+@mixin stack($gap) {
+  display: flex;
+  flex-direction: column;
+  gap: $gap;
+}
+
+/* Bordered panel on the page background: cards, banners, stats, the table. */
+@mixin card($radius: var(--radius-lg)) {
+  border: 1px solid var(--border);
+  border-radius: $radius;
+  background: var(--surface);
+}
+
+/* Title and subtitle at the top of a page. */
+@mixin page-heading {
+  @include stack(4px);
+
+  h1 {
+    margin: 0;
+    font-size: var(--font-title);
+    font-weight: 700;
+  }
+
+  p {
+    color: var(--text-muted);
+    font-size: var(--font-sm);
+  }
+}
+
+/* Neutral button; `$hover` is off when the caller needs its own hover rule. */
+@mixin button($hover: true) {
+  padding: 9px 16px;
+  border: 1px solid var(--button-border);
+  border-radius: var(--radius-md);
+  background: var(--button-bg);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--font-md);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+
+  @if $hover {
+    @include hover {
+      filter: brightness(1.15);
+    }
+  }
+}
+
+/* Solid colour variant of `button`. */
+@mixin button-fill($background, $color) {
+  border-color: $background;
+  background: $background;
+  color: $color;
+}

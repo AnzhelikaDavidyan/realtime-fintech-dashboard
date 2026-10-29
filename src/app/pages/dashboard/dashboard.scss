@@ -1,7 +1,18 @@
+@use 'abstracts' as *;
+
 :host {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
+  @include stack(var(--page-gap));
+
+  /* Table density; tighter on small screens, where the table scrolls sideways. */
+  --cell-padding-block: 13px;
+  --cell-padding-inline: 18px;
+  --table-min-width: 920px;
+
+  @include media-down(md) {
+    --cell-padding-block: 11px;
+    --cell-padding-inline: 12px;
+    --table-min-width: 760px;
+  }
 }
 
 p {
@@ -9,34 +20,28 @@ p {
 }
 
 .heading {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  @include page-heading;
 
   h1 {
-    margin: 0;
     outline: none;
-    font-size: 22px;
-    font-weight: 700;
-  }
-
-  p {
-    color: var(--text-muted);
-    font-size: 13px;
   }
 }
 
 /* Banners: loading (neutral), paused (warning), error (danger). */
 .banner {
+  @include card;
+
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
   padding: 14px 14px 14px 18px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--surface);
   color: var(--text-muted);
-  font-size: 14px;
+  font-size: var(--font-md);
+
+  p {
+    flex: 1 1 240px;
+  }
 
   strong {
     color: var(--text-strong);
@@ -57,65 +62,73 @@ p {
 }
 
 .banner__action {
+  @include button($hover: false);
+
   margin-left: auto;
   padding: 7px 14px;
-  border: 1px solid currentColor;
-  border-radius: var(--radius-md);
+  border-color: currentcolor;
   background: transparent;
   color: inherit;
-  font: inherit;
-  font-weight: 600;
-  white-space: nowrap;
-  cursor: pointer;
+  font-size: inherit;
 }
 
 .banner__icon {
-  font-size: 16px;
+  font-size: var(--font-lg);
   font-weight: 700;
 }
 
 .stats {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
+
+  @include media-up(md) {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 .stat {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  @include card;
+  @include stack(6px);
+
   padding: 14px 16px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--surface);
+
+  @include media-down(sm) {
+    padding: 12px;
+  }
 }
 
 .stat__label {
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--font-xs);
   font-weight: 600;
   text-transform: uppercase;
 }
 
 .stat__value {
-  font-size: 20px;
+  font-size: var(--font-xl);
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
+
+  @include media-down(sm) {
+    font-size: var(--font-lg);
+  }
 }
 
 /* The table keeps the design's column widths and scrolls sideways on small screens. */
 .table-scroll {
+  @include card;
+
   overflow-x: auto;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--surface);
+  overscroll-behavior-x: contain;
 }
 
 .market {
   width: 100%;
-  min-width: 920px;
+  min-width: var(--table-min-width);
   border-collapse: collapse;
   table-layout: fixed;
-  font-size: 14px;
+  font-size: var(--font-md);
 }
 
 .col--instrument {
@@ -135,21 +148,29 @@ p {
 
 th,
 td {
-  padding: 13px 18px;
+  padding: var(--cell-padding-block) var(--cell-padding-inline);
   text-align: left;
   white-space: nowrap;
 }
 
+/* Fixed-width digits: live values update in place without the columns jittering. */
 .num {
+  font-variant-numeric: tabular-nums;
   text-align: right;
 }
 
 thead th {
   background: var(--surface-header);
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--font-xs);
   font-weight: 600;
   text-transform: uppercase;
+}
+
+/* The instrument stays in view while the other columns scroll past it. */
+th:first-child {
+  position: sticky;
+  left: 0;
 }
 
 tbody tr {
@@ -157,6 +178,7 @@ tbody tr {
 }
 
 tbody th {
+  background: var(--surface);
   font-weight: 700;
 }
 
@@ -164,7 +186,8 @@ tbody td {
   font-weight: 400;
 }
 
-.instrument {
+.instrument,
+.price {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -172,20 +195,15 @@ tbody td {
 
 .instrument__avatar {
   display: inline-grid;
+  flex: none;
   place-items: center;
   width: 30px;
   height: 30px;
   border-radius: 8px;
   background: var(--surface-raised);
   color: var(--text-accent);
-  font-size: 11px;
+  font-size: var(--font-2xs);
   font-weight: 600;
-}
-
-.price {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
 }
 
 .price__value {
@@ -193,7 +211,7 @@ tbody td {
 }
 
 .trend {
-  font-size: 11px;
+  font-size: var(--font-2xs);
 
   &--up {
     color: var(--up);
@@ -222,6 +240,12 @@ tbody td {
   }
 }
 
+app-imbalance-bar {
+  @include media-down(md) {
+    --imbalance-bar-width: 64px;
+  }
+}
+
 /* Values not available yet: a fainter dash, as in the design. */
 app-value.is-missing {
   color: var(--text-faint);
@@ -234,11 +258,5 @@ app-value.is-missing {
   justify-content: space-between;
   gap: 8px 24px;
   color: var(--text-faint);
-  font-size: 12px;
-}
-
-@media (max-width: 720px) {
-  .stats {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+  font-size: var(--font-xs);
 }

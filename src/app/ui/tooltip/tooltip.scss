@@ -5,21 +5,22 @@
 
 .tooltip {
   position: absolute;
-  z-index: 1;
+  z-index: var(--z-tooltip);
   right: 0;
   bottom: calc(100% + 8px);
   width: max-content;
-  max-width: 240px;
+  /* Never wider than the screen, minus the page gutters. */
+  max-width: min(240px, calc(100vw - 2 * var(--page-gutter)));
   padding: 8px 10px;
   border: 1px solid var(--button-border);
   border-radius: var(--radius-sm);
   background: var(--surface-raised);
   color: var(--text);
-  font-size: 12px;
+  font-size: var(--font-xs);
   line-height: 1.4;
   visibility: hidden;
   opacity: 0;
-  transition: opacity 120ms;
+  transition: opacity var(--duration-fast);
   pointer-events: none;
 }
 

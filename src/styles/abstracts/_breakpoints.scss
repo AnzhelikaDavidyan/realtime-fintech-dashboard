@@ -1,0 +1,45 @@
+@use 'sass:map';
+
+/*
+ * Layout breakpoints (min widths). Media queries can't read CSS custom properties,
+ * so the values live here; spacing that changes with them lives in tokens (styles.scss).
+ *
+ *   sm  480px  large phones
+ *   md  720px  tablets: header on one row, four stats per row
+ *   lg  960px  small laptops: settings form and help side by side
+ *   xl  1280px wide desktops
+ */
+$breakpoints: (
+  sm: 480px,
+  md: 720px,
+  lg: 960px,
+  xl: 1280px,
+);
+
+@function breakpoint($name) {
+  @if not map.has-key($breakpoints, $name) {
+    @error 'Unknown breakpoint `#{$name}`. Use one of: #{map.keys($breakpoints)}.';
+  }
+  @return map.get($breakpoints, $name);
+}
+
+/* From the breakpoint up (mobile first). */
+@mixin media-up($name) {
+  @media (width >= breakpoint($name)) {
+    @content;
+  }
+}
+
+/* Below the breakpoint. */
+@mixin media-down($name) {
+  @media (width < breakpoint($name)) {
+    @content;
+  }
+}
+
+/* From `$from` up to, but not including, `$to`. */
+@mixin media-between($from, $to) {
+  @media (breakpoint($from) <= width < breakpoint($to)) {
+    @content;
+  }
+}
