@@ -1,6 +1,7 @@
 import {
   computed,
   DestroyRef,
+  DOCUMENT,
   inject,
   Injectable,
   InjectionToken,
@@ -58,10 +59,14 @@ export type RunOutcome = 'pending' | 'started' | 'failed';
  * Creates the Web Worker once and starts a run with the default settings.
  * Every `apply` or `retry` starts a new run with a new id; snapshots from any
  * earlier run are ignored, so the screen never shows stale data.
+ *
+ * While the page is hidden the worker keeps generating but sends no snapshots,
+ * so a background tab does no decoding or rendering work.
  */
 @Injectable({ providedIn: 'root' })
 export class ProducerService {
   private readonly createWorker = inject(PRODUCER_WORKER_FACTORY);
+  private readonly document = inject(DOCUMENT);
   private worker: ProducerWorker | null = null;
   private lastRunId = 0;
 
@@ -104,7 +109,16 @@ export class ProducerService {
   constructor() {
     this.replaceWorker();
     this.startRun(DEFAULT_PRODUCER_SETTINGS);
-    inject(DestroyRef).onDestroy(() => this.terminateWorker());
+
+    const onVisibilityChange = () =>
+      this.document.hidden
+        ? this.send({ type: 'pause-snapshots' }, { reason: 'page hidden' })
+        : this.send({ type: 'resume-snapshots' }, { reason: 'page visible again' });
+    this.document.addEventListener('visibilitychange', onVisibilityChange);
+    inject(DestroyRef).onDestroy(() => {
+      this.document.removeEventListener('visibilitychange', onVisibilityChange);
+      this.terminateWorker();
+    });
   }
 
   pause(): void {
@@ -154,6 +168,10 @@ export class ProducerService {
     worker.onerror = (event) =>
       this.fail(event.message || 'The market data worker could not start.');
     this.worker = worker;
+    // A new worker sends snapshots, so tell it if the page is already hidden.
+    if (this.document.hidden) {
+      this.send({ type: 'pause-snapshots' }, { reason: 'new worker while the page is hidden' });
+    }
   }
 
   /** Stops the worker; clearing its handlers first means nothing it still sends is used. */
@@ -212,8 +230,9 @@ export class ProducerService {
     this._runOutcome.set('failed');
   }
 
-  private send(command: WorkerCommand): void {
-    logMessage('sent to worker', command, { workerExists: this.worker !== null });
+  /** `log` adds fields to the dev log, e.g. why the command was sent. */
+  private send(command: WorkerCommand, log: object = {}): void {
+    logMessage('sent to worker', command, { workerExists: this.worker !== null, ...log });
     this.worker?.postMessage(command);
   }
 }

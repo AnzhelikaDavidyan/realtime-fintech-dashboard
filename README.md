@@ -84,6 +84,8 @@ Before committing, run `npm run format:check`, `npm run lint`, `npx ng test --wa
    metrics into one `Float64Array` and transfers it to the UI.
 4. `ProducerService` ignores snapshots from older runs, decodes the rest into a signal, and the
    dashboard re-renders from it.
+5. While the page is hidden, `ProducerService` sends `pause-snapshots`: the engine keeps generating
+   but posts nothing. `resume-snapshots` on return sends the latest state at once.
 
 ### Project layout
 
@@ -140,6 +142,13 @@ _Trade-off:_ applying settings resets all metrics; there is no live reconfigurat
 **Pause does not make up time.** Resume continues with the next batch; nothing is generated for the
 paused period.
 _Trade-off:_ total updates no longer equal rate × elapsed time once a run has been paused.
+
+**No snapshots while the page is hidden.** A background tab would otherwise receive, decode and
+re-render 10 snapshots a second that nobody sees. On `visibilitychange` the service pauses and
+resumes snapshots only; the run keeps generating, so totals stay correct and the table is current
+the moment the tab returns.
+_Trade-off:_ one more piece of state in the worker that must survive new runs and replaced
+workers (a new worker is told straight away if the page is already hidden).
 
 **Seeded, deterministic producer.** xorshift64\* with a seed: the same seed and instrument count
 replay the same market, which makes tests and bug reports reproducible.

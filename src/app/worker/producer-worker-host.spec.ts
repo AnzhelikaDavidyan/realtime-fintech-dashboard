@@ -109,6 +109,49 @@ describe('ProducerWorkerHost', () => {
       ]);
     });
 
+    it('routes pause-snapshots and resume-snapshots to the engine', async () => {
+      const { host, time, ofType } = setup();
+      await host.loaded;
+      host.receive({ type: 'start', runId: 1 });
+      host.receive({ type: 'pause-snapshots' });
+      time.advance(1_000);
+      expect(ofType('snapshot')).toHaveLength(0);
+
+      host.receive({ type: 'resume-snapshots' });
+      expect(ofType('snapshot')).toHaveLength(1);
+      expect(ofType('error')).toHaveLength(0);
+    });
+
+    it('logs how much was generated while snapshots were paused (dev builds)', async () => {
+      const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+      const { host, time } = setup();
+      await host.loaded;
+      // 10 updates every 100 ms.
+      host.receive({ type: 'init', settings: { updatesPerBatch: 10, batchIntervalMs: 100 } });
+      host.receive({ type: 'start', runId: 1 });
+      time.advance(300);
+      host.receive({ type: 'pause-snapshots' });
+      time.advance(2_000);
+      host.receive({ type: 'resume-snapshots' });
+
+      /** Fields of the first log line headed by `type`. */
+      const fields = (type: string) =>
+        log.mock.calls.find(([header]) => String(header).includes(type))?.[2];
+      expect(fields('snapshots-paused')).toMatchObject({
+        status: 'running',
+        runId: 1,
+        totalUpdates: 30,
+      });
+      expect(fields('snapshots-resumed')).toEqual({
+        status: 'running',
+        runId: 1,
+        pausedForMs: 2_000,
+        generatedWhilePaused: 200,
+        catchUpSnapshotSent: true,
+      });
+      log.mockRestore();
+    });
+
     it('starts runs with the settings from init', async () => {
       const { host, time, ofType } = setup();
       await host.loaded;

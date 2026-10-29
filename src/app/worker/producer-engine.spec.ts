@@ -145,6 +145,85 @@ describe('ProducerEngine', () => {
     });
   });
 
+  describe('snapshots paused (page hidden)', () => {
+    it('keeps generating but sends nothing', () => {
+      const { engine, time, snapshots } = setup();
+      engine.start(1, settings);
+      time.advance(300);
+      const count = snapshots().length;
+
+      engine.pauseSnapshots();
+      time.advance(1_000);
+
+      expect(snapshots()).toHaveLength(count);
+      expect(engine.totalUpdates).toBe(130);
+      expect(engine.status).toBe('running');
+      expect(time.activeTimers).toBe(1); // batches only
+    });
+
+    it('sends the latest state at once on resume, then every 100 ms again', () => {
+      const { engine, time, snapshots } = setup();
+      engine.start(1, settings);
+      engine.pauseSnapshots();
+      time.advance(1_000);
+      expect(snapshots()).toHaveLength(0);
+
+      engine.resumeSnapshots();
+      expect(snapshots()).toHaveLength(1);
+      expect(snapshots()[0].totalUpdates).toBe(100);
+      expect(volumeOf(snapshots()[0])).toBe(100);
+
+      time.advance(300);
+      expect(snapshots()).toHaveLength(4);
+    });
+
+    it('stays paused across a new run and across pause / resume', () => {
+      const { engine, time, snapshots } = setup();
+      engine.start(1, settings);
+      engine.pauseSnapshots();
+      engine.start(2, settings);
+      engine.pause();
+      engine.resume();
+      time.advance(1_000);
+      expect(snapshots()).toHaveLength(0);
+
+      engine.resumeSnapshots();
+      expect(snapshots().map((s) => s.runId)).toEqual([2]);
+    });
+
+    // A paused run has nothing new to show; its snapshots restart with `resume`.
+    it('does not send or schedule snapshots on resume while the run is paused', () => {
+      const { engine, time, snapshots } = setup();
+      engine.start(1, settings);
+      time.advance(300);
+      engine.pause();
+      engine.pauseSnapshots();
+      const count = snapshots().length;
+
+      engine.resumeSnapshots();
+      expect(snapshots()).toHaveLength(count);
+      expect(time.activeTimers).toBe(0);
+
+      engine.resume();
+      time.advance(100);
+      expect(snapshots()).toHaveLength(count + 1);
+    });
+
+    it('ignores repeated pause or resume of snapshots', () => {
+      const { engine, time, snapshots } = setup();
+      engine.start(1, settings);
+      engine.resumeSnapshots();
+      expect(snapshots()).toHaveLength(0);
+      expect(time.activeTimers).toBe(2);
+
+      engine.pauseSnapshots();
+      engine.pauseSnapshots();
+      engine.resumeSnapshots();
+      engine.resumeSnapshots();
+      expect(time.activeTimers).toBe(2);
+    });
+  });
+
   describe('pause, resume and run switching', () => {
     describe('pause', () => {
       it('stops batches: the generator is not called again', () => {

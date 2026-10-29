@@ -18,12 +18,20 @@ export interface ProducerWorkerHostDeps {
   readonly clock: Clock;
 }
 
+interface SnapshotPause {
+  readonly at: number;
+  readonly runId: number;
+  readonly totalUpdates: number;
+}
+
 const COMMAND_TYPES: ReadonlySet<string> = new Set<WorkerCommandType>([
   'init',
   'start',
   'pause',
   'resume',
   'finish',
+  'pause-snapshots',
+  'resume-snapshots',
 ]);
 
 /**
@@ -38,6 +46,9 @@ export class ProducerWorkerHost {
   private loadError: string | null = null;
   private settings: Partial<ProducerSettings> = {};
   private queued: WorkerCommand[] = [];
+  /** Engine state when snapshots were paused, for the dev log on resume. */
+  private snapshotsPausedAt: SnapshotPause | null = null;
+  private snapshotsPosted = 0;
 
   constructor(private readonly deps: ProducerWorkerHostDeps) {
     this.loaded = this.load();
@@ -106,6 +117,16 @@ export class ProducerWorkerHost {
         case 'finish':
           engine.finish();
           break;
+        case 'pause-snapshots':
+          engine.pauseSnapshots();
+          this.snapshotsPaused(engine);
+          break;
+        case 'resume-snapshots': {
+          const posted = this.snapshotsPosted;
+          engine.resumeSnapshots();
+          this.snapshotsResumed(engine, this.snapshotsPosted > posted);
+          break;
+        }
       }
     } catch (error) {
       this.post({
@@ -116,6 +137,41 @@ export class ProducerWorkerHost {
     }
   }
 
+  private snapshotsPaused(engine: ProducerEngine): void {
+    // A repeated pause keeps the first one, so the summary covers the whole hidden time.
+    this.snapshotsPausedAt ??= {
+      at: this.deps.clock(),
+      runId: engine.currentRunId,
+      totalUpdates: engine.totalUpdates,
+    };
+    logMessage('worker snapshots', {
+      type: 'snapshots-paused',
+      status: engine.status,
+      runId: engine.currentRunId,
+      totalUpdates: engine.totalUpdates,
+      note: 'generation goes on, nothing is posted',
+    });
+  }
+
+  private snapshotsResumed(engine: ProducerEngine, catchUpSent: boolean): void {
+    const paused = this.snapshotsPausedAt;
+    this.snapshotsPausedAt = null;
+    if (!paused) {
+      return;
+    }
+    const sameRun = paused.runId === engine.currentRunId;
+    logMessage('worker snapshots', {
+      type: 'snapshots-resumed',
+      status: engine.status,
+      runId: engine.currentRunId,
+      pausedForMs: Math.round(this.deps.clock() - paused.at),
+      generatedWhilePaused: sameRun
+        ? engine.totalUpdates - paused.totalUpdates
+        : `new run started while paused (now ${engine.totalUpdates})`,
+      catchUpSnapshotSent: catchUpSent,
+    });
+  }
+
   private drainQueue(): WorkerCommand[] {
     const commands = this.queued;
     this.queued = [];
@@ -124,7 +180,11 @@ export class ProducerWorkerHost {
 
   private post(event: WorkerEvent): void {
     logMessage('worker sending to Angular', event);
-    const transfer = event.type === 'snapshot' ? [event.metrics.buffer] : [];
+    const transfer: Transferable[] = [];
+    if (event.type === 'snapshot') {
+      this.snapshotsPosted++;
+      transfer.push(event.metrics.buffer);
+    }
     this.deps.port.postMessage(event, transfer);
   }
 }

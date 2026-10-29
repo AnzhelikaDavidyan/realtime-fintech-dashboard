@@ -226,6 +226,58 @@ describe('ProducerService', () => {
     });
   });
 
+  describe('page visibility', () => {
+    /** Makes the page hidden or visible and fires `visibilitychange`, as the browser does. */
+    function setHidden(hidden: boolean) {
+      vi.spyOn(document, 'hidden', 'get').mockReturnValue(hidden);
+      document.dispatchEvent(new Event('visibilitychange'));
+    }
+
+    afterEach(() => vi.restoreAllMocks());
+
+    it('stops snapshots while the page is hidden and restarts them when it is shown', () => {
+      const { sentSinceStartup } = setup();
+      setHidden(true);
+      setHidden(false);
+      expect(sentSinceStartup()).toEqual([
+        { type: 'pause-snapshots' },
+        { type: 'resume-snapshots' },
+      ]);
+    });
+
+    it('says in the dev log why snapshots were paused or resumed', () => {
+      const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+      setup();
+      setHidden(true);
+      setHidden(false);
+      const reasons = log.mock.calls
+        .filter(([header]) => String(header).includes('-snapshots'))
+        .map(([header, , fields]) => [String(header).replace(/_/g, ''), fields.reason]);
+      expect(reasons).toEqual([
+        ['pause-snapshots', 'page hidden'],
+        ['resume-snapshots', 'page visible again'],
+      ]);
+    });
+
+    it('tells a replacement worker straight away when the page is hidden', () => {
+      const { service, workers, worker } = setup();
+      setHidden(true);
+      service.retry();
+      expect(workers).toHaveLength(2);
+      expect(worker().sent[0]).toEqual({ type: 'pause-snapshots' });
+    });
+
+    it('stops listening once the service is destroyed', () => {
+      const add = vi.spyOn(document, 'addEventListener');
+      const remove = vi.spyOn(document, 'removeEventListener');
+      setup();
+      const [, listener] = add.mock.calls.find(([type]) => type === 'visibilitychange')!;
+
+      TestBed.resetTestingModule();
+      expect(remove).toHaveBeenCalledWith('visibilitychange', listener);
+    });
+  });
+
   describe('errors', () => {
     it('shows a load failure and marks the producer unusable', () => {
       const { service, worker } = setup();

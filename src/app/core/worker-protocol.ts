@@ -7,6 +7,8 @@ export type WorkerStatus = 'idle' | 'running' | 'paused' | 'finished';
  * Messages the UI sends to the worker.
  *
  * `init` stores settings; `start` begins a fresh run with them under `runId`.
+ * `pause-snapshots` / `resume-snapshots` stop and restart sending snapshots
+ * (generation goes on), e.g. while the page is hidden.
  * Commands sent before the Wasm module is loaded are queued and run once it is.
  */
 export type WorkerCommand =
@@ -14,7 +16,9 @@ export type WorkerCommand =
   | { readonly type: 'start'; readonly runId: number }
   | { readonly type: 'pause' }
   | { readonly type: 'resume' }
-  | { readonly type: 'finish' };
+  | { readonly type: 'finish' }
+  | { readonly type: 'pause-snapshots' }
+  | { readonly type: 'resume-snapshots' };
 
 /** Messages the worker sends to the UI. */
 export type WorkerEvent =

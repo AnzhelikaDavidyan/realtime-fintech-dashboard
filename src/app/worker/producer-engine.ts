@@ -47,6 +47,10 @@ export const SNAPSHOT_INTERVAL_MS = 100;
  * `start` is allowed from any state and begins a fresh run. `pause` outside
  * `running`, and `resume` outside `paused`, are ignored. After `finish` only
  * `start` does anything.
+ *
+ * Snapshots can be paused on their own (`pauseSnapshots`), e.g. while the page
+ * is hidden: generation and totals go on, nothing is sent. This holds across
+ * runs until `resumeSnapshots`, which sends the latest state at once.
  */
 export class ProducerEngine {
   private state: WorkerStatus = 'idle';
@@ -54,7 +58,9 @@ export class ProducerEngine {
   private settings: ProducerSettings = normalizeProducerSettings();
   private generator: BatchGenerator | null = null;
   private metrics: MetricsAggregator | null = null;
-  private cancelTimers: (() => void) | null = null;
+  private cancelBatches: (() => void) | null = null;
+  private cancelSnapshots: (() => void) | null = null;
+  private snapshotsPaused = false;
   private generated = 0;
   /** True when a batch arrived since the last snapshot. */
   private changed = false;
@@ -67,6 +73,11 @@ export class ProducerEngine {
 
   get totalUpdates(): number {
     return this.generated;
+  }
+
+  /** Id of the current (or last) run; 0 before the first `start`. */
+  get currentRunId(): number {
+    return this.runId;
   }
 
   /**
@@ -105,6 +116,24 @@ export class ProducerEngine {
     }
     this.startTimers();
     this.setStatus('running');
+  }
+
+  /** Stops sending snapshots; generation goes on. */
+  pauseSnapshots(): void {
+    this.snapshotsPaused = true;
+    this.stopSnapshots();
+  }
+
+  /** Sends snapshots again, starting with one now so the UI catches up without waiting. */
+  resumeSnapshots(): void {
+    if (!this.snapshotsPaused) {
+      return;
+    }
+    this.snapshotsPaused = false;
+    if (this.state === 'running') {
+      this.snapshot();
+      this.startSnapshots();
+    }
   }
 
   /** Ends the run and releases the generator. */
@@ -150,19 +179,27 @@ export class ProducerEngine {
   }
 
   private startTimers(): void {
-    const stopBatches = this.deps.scheduler.every(this.settings.batchIntervalMs, () =>
+    this.cancelBatches = this.deps.scheduler.every(this.settings.batchIntervalMs, () =>
       this.batch(),
     );
-    const stopSnapshots = this.deps.scheduler.every(SNAPSHOT_INTERVAL_MS, () => this.snapshot());
-    this.cancelTimers = () => {
-      stopBatches();
-      stopSnapshots();
-    };
+    if (!this.snapshotsPaused) {
+      this.startSnapshots();
+    }
+  }
+
+  private startSnapshots(): void {
+    this.cancelSnapshots = this.deps.scheduler.every(SNAPSHOT_INTERVAL_MS, () => this.snapshot());
   }
 
   private stopTimers(): void {
-    this.cancelTimers?.();
-    this.cancelTimers = null;
+    this.cancelBatches?.();
+    this.cancelBatches = null;
+    this.stopSnapshots();
+  }
+
+  private stopSnapshots(): void {
+    this.cancelSnapshots?.();
+    this.cancelSnapshots = null;
   }
 
   /** Frees the current generator now instead of waiting for garbage collection. */
