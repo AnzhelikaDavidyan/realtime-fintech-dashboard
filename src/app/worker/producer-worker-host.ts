@@ -3,6 +3,9 @@ import { WorkerCommand, WorkerCommandType, WorkerEvent } from '../core/worker-pr
 import { ProducerWasm } from './load-producer-wasm';
 import { Clock, ProducerEngine, Scheduler } from './producer-engine';
 
+/** Set by Angular: undefined or truthy in dev, replaced with false in production builds. */
+declare const ngDevMode: unknown;
+
 /** The part of the worker global scope the host needs. */
 export interface WorkerPort {
   postMessage(message: WorkerEvent, transfer: Transferable[]): void;
@@ -42,6 +45,7 @@ export class ProducerWorkerHost {
 
   /** Handles one message from the UI. */
   receive(data: unknown): void {
+    logMessage('worker received from Angular', data);
     if (!isWorkerCommand(data)) {
       this.post({ type: 'error', message: `Unknown command: ${JSON.stringify(data)}` });
       return;
@@ -119,9 +123,27 @@ export class ProducerWorkerHost {
   }
 
   private post(event: WorkerEvent): void {
+    logMessage('worker sending to Angular', event);
     const transfer = event.type === 'snapshot' ? [event.metrics.buffer] : [];
     this.deps.port.postMessage(event, transfer);
   }
+}
+
+/**
+ * Debug log of one message on the worker side, headed by its type. Dev builds only.
+ * Snapshot metrics are summarised: the buffer is transferred right after, so a logged
+ * array would show up empty when expanded.
+ */
+function logMessage(direction: string, message: unknown): void {
+  if (typeof ngDevMode !== 'undefined' && !ngDevMode) {
+    return;
+  }
+  const { type = 'unknown', ...fields } =
+    typeof message === 'object' && message !== null ? (message as Record<string, unknown>) : {};
+  if (fields['metrics'] instanceof Float64Array) {
+    fields['metrics'] = `${fields['metrics'].length} numbers`;
+  }
+  console.log(`__________________${String(type)}__________________`, direction, fields);
 }
 
 function isWorkerCommand(data: unknown): data is WorkerCommand {

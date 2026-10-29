@@ -4,6 +4,7 @@ import {
   inject,
   Injectable,
   InjectionToken,
+  isDevMode,
   linkedSignal,
   signal,
 } from '@angular/core';
@@ -166,6 +167,10 @@ export class ProducerService {
   }
 
   private handle(event: WorkerEvent): void {
+    logMessage('received from worker', event, {
+      currentRunId: this._runId(),
+      ...(event.type === 'snapshot' && { ignored: event.runId !== this._runId() }),
+    });
     switch (event.type) {
       case 'ready':
         break;
@@ -208,8 +213,21 @@ export class ProducerService {
   }
 
   private send(command: WorkerCommand): void {
+    logMessage('sent to worker', command, { workerExists: this.worker !== null });
     this.worker?.postMessage(command);
   }
+}
+
+/** Debug log of one message between the UI and the worker, headed by its type. Dev builds only. */
+function logMessage(
+  direction: string,
+  { type, ...fields }: WorkerCommand | WorkerEvent,
+  extra: object,
+): void {
+  if (!isDevMode()) {
+    return;
+  }
+  console.log(`__________________${type}__________________`, direction, { ...fields, ...extra });
 }
 
 /** Commands that set up and start a run; if one fails, the run never starts. */
