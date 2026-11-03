@@ -62,6 +62,7 @@ describe('ProducerWorkerHost', () => {
       expect(messages()).toEqual([
         {
           type: 'error',
+          kind: 'worker',
           message: 'Could not download the market engine (/wasm/x.wasm): server answered 404',
         },
       ]);
@@ -73,9 +74,9 @@ describe('ProducerWorkerHost', () => {
       host.receive({ type: 'start', runId: 1, settings: {} });
       expect(ofType('error').at(-1)).toEqual({
         type: 'error',
+        kind: 'worker',
         message: 'The market engine is unavailable: boom',
         command: 'start',
-        runId: 1,
       });
     });
   });
@@ -171,6 +172,28 @@ describe('ProducerWorkerHost', () => {
       expect(decodeMetrics(last.metrics)).toHaveLength(4);
     });
 
+    it('reports a failed start as a run error for that run', async () => {
+      const { host, ofType } = setup(() =>
+        Promise.resolve({
+          ...fakeWasm,
+          createGenerator: () => {
+            throw new Error('Generator rejected the seed');
+          },
+        }),
+      );
+      await host.loaded;
+      host.receive({ type: 'start', runId: 4, settings: {} });
+      expect(ofType('error')).toEqual([
+        {
+          type: 'error',
+          kind: 'run',
+          runId: 4,
+          message: 'Generator rejected the seed',
+          command: 'start',
+        },
+      ]);
+    });
+
     it('rejects unknown or malformed messages with a readable error', async () => {
       const { host, ofType } = setup();
       await host.loaded;
@@ -186,6 +209,7 @@ describe('ProducerWorkerHost', () => {
       }
       expect(ofType('error')).toHaveLength(5);
       expect(ofType('error')[0].message).toContain('Unknown command');
+      expect(ofType('error').map((e) => e.kind)).toEqual(Array(5).fill('command'));
       expect(ofType('status')).toHaveLength(0);
     });
   });

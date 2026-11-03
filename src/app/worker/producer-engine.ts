@@ -174,6 +174,7 @@ export class ProducerEngine {
       // A failing generator would fail again on every batch, so end the run.
       this.deps.emit({
         type: 'error',
+        kind: 'run',
         message: error instanceof Error ? error.message : String(error),
         runId: this.runId,
       });

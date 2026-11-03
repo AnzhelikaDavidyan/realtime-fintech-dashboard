@@ -228,6 +228,7 @@ describe('Dashboard', () => {
       const { emit, banner, stat, text } = setup();
       await emit({
         type: 'error',
+        kind: 'worker',
         message: 'Could not download the market engine (/wasm/x.wasm): server answered 404',
       });
 
@@ -242,19 +243,29 @@ describe('Dashboard', () => {
 
     it('does not add a second full stop', async () => {
       const { emit, banner, text } = setup();
-      await emit({ type: 'error', message: 'Worker crashed.' });
+      await emit({ type: 'error', kind: 'worker', message: 'Worker crashed.' });
       expect(text(banner())).toContain('Worker crashed. Retry starts');
     });
 
     it('shows why the run could not start instead of loading forever', async () => {
       const { emit, banner, text } = setup();
-      await emit({ type: 'error', message: 'Generator rejected the seed', command: 'start' });
+      await emit({
+        type: 'error',
+        kind: 'run',
+        message: 'Generator rejected the seed',
+        command: 'start',
+        runId: 1,
+      });
       expect(text(banner())).toContain('Producer failed to start. Generator rejected the seed.');
     });
 
     it('retries with a new worker and moves focus to the heading', async () => {
       const { fixture, emit, workers, banner, retryButton, text } = setup();
-      await emit({ type: 'error', message: 'Could not download the market engine' });
+      await emit({
+        type: 'error',
+        kind: 'worker',
+        message: 'Could not download the market engine',
+      });
       expect(text(retryButton())).toBe('Retry');
 
       retryButton()!.focus();
@@ -270,11 +281,15 @@ describe('Dashboard', () => {
 
     it('shows the error again when the retry fails too', async () => {
       const { fixture, emit, banner, retryButton, text } = setup();
-      await emit({ type: 'error', message: 'Could not download the market engine' });
+      await emit({
+        type: 'error',
+        kind: 'worker',
+        message: 'Could not download the market engine',
+      });
       retryButton()!.click();
       await fixture.whenStable();
 
-      await emit({ type: 'error', message: 'Still offline' });
+      await emit({ type: 'error', kind: 'worker', message: 'Still offline' });
 
       expect(text(banner())).toContain('Producer failed to start. Still offline.');
       expect(retryButton()).not.toBeNull();
@@ -282,8 +297,17 @@ describe('Dashboard', () => {
 
     it('says the producer stopped when a run ends with an error', async () => {
       const { emit, banner, text, status } = setup();
-      await emit({ type: 'error', message: 'wasm trapped' }, status('finished'));
+      await emit(
+        { type: 'error', kind: 'run', message: 'wasm trapped', runId: 1 },
+        status('finished'),
+      );
       expect(text(banner())).toContain('Producer stopped. wasm trapped');
+    });
+
+    it('does not blame loading when a run just ended', async () => {
+      const { emit, banner, text, status } = setup();
+      await emit(status('finished'));
+      expect(text(banner())).toContain('Producer stopped. The run has ended.');
     });
   });
 

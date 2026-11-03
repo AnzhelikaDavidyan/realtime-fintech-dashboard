@@ -58,7 +58,7 @@ describe('ProducerControls', () => {
 
   it('offers Retry after an error, which replaces the worker', async () => {
     const { emit, status, button, text, workers } = setup();
-    await emit({ type: 'error', message: 'Could not download the market engine' });
+    await emit({ type: 'error', kind: 'worker', message: 'Could not download the market engine' });
     expect(text(status())).toBe('Error');
     expect(text(button())).toBe('↻ Retry');
 

@@ -81,7 +81,7 @@ export class ProducerService {
   readonly totalUpdates = this._totalUpdates.asReadonly();
   readonly runId = this._runId.asReadonly();
   readonly activeSettings = this._activeSettings.asReadonly();
-  /** Last problem reported by the worker, or null. */
+  /** Why the worker or the current run failed, or null. */
   readonly error = this._error.asReadonly();
   readonly runOutcome = this._runOutcome.asReadonly();
 
@@ -203,20 +203,30 @@ export class ProducerService {
         this._totalUpdates.set(event.totalUpdates);
         break;
       case 'error':
-        // Not tied to a command: Wasm failed to load or the run itself failed,
-        // so nothing more will arrive until `retry`.
-        if (event.command === undefined) {
+        this.handleError(event);
+        break;
+    }
+  }
+
+  private handleError(event: Extract<WorkerEvent, { type: 'error' }>): void {
+    switch (event.kind) {
+      case 'worker':
+        // Once the worker is unusable, the first message says why; the errors
+        // for commands that were waiting would only repeat it.
+        if (this._status() !== 'error') {
           this.fail(event.message);
-        } else if (this._status() !== 'error') {
-          // Once the worker is unusable, the first message says why; the errors
-          // for commands that were waiting would only repeat it.
-          if (event.command === 'start' && this._runOutcome() === 'pending') {
-            // The run never started, so no data will come until `retry`.
-            this.fail(event.message);
-          } else {
-            this._error.set(event.message);
-          }
         }
+        break;
+      case 'run':
+        // No data will come for this run until `apply` or `retry`.
+        this.fail(event.message);
+        break;
+      case 'command':
+        // A rejected command is a bug in the UI, not something the person can
+        // act on, so it is logged rather than shown and the run goes on.
+        console.error(
+          `The market data worker rejected ${event.command ?? 'a message'}: ${event.message}`,
+        );
         break;
     }
   }

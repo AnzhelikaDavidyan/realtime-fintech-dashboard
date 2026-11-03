@@ -55,15 +55,19 @@ export class ProducerWorkerHost {
   receive(data: unknown): void {
     logMessage('worker received from Angular', data);
     if (!isWorkerCommand(data)) {
-      this.post({ type: 'error', message: `Unknown command: ${JSON.stringify(data)}` });
+      this.post({
+        type: 'error',
+        kind: 'command',
+        message: `Unknown command: ${JSON.stringify(data)}`,
+      });
       return;
     }
     if (this.loadError !== null) {
       this.post({
         type: 'error',
+        kind: 'worker',
         message: `The market engine is unavailable: ${this.loadError}`,
         command: data.type,
-        ...runIdOf(data),
       });
       return;
     }
@@ -90,7 +94,7 @@ export class ProducerWorkerHost {
       }
     } catch (error) {
       this.loadError = error instanceof Error ? error.message : String(error);
-      this.post({ type: 'error', message: this.loadError });
+      this.post({ type: 'error', kind: 'worker', message: this.loadError });
       for (const command of this.drainQueue()) {
         this.receive(command);
       }
@@ -126,9 +130,10 @@ export class ProducerWorkerHost {
     } catch (error) {
       this.post({
         type: 'error',
+        // Only a failed `start` affects a run; any other command fails on its own.
+        ...(command.type === 'start' ? { kind: 'run', runId: command.runId } : { kind: 'command' }),
         message: error instanceof Error ? error.message : String(error),
         command: command.type,
-        ...runIdOf(command),
       });
     }
   }
@@ -220,9 +225,4 @@ function isWorkerCommand(data: unknown): data is WorkerCommand {
     );
   }
   return true;
-}
-
-/** The run a failed command was for: only `start` names one. */
-function runIdOf(command: WorkerCommand): { runId?: number } {
-  return command.type === 'start' ? { runId: command.runId } : {};
 }

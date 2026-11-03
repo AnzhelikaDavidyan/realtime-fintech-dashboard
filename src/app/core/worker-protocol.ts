@@ -23,6 +23,14 @@ export type WorkerCommand =
   | { readonly type: 'pause-snapshots' }
   | { readonly type: 'resume-snapshots' };
 
+/**
+ * What an error stopped:
+ * - `worker`: the worker is unusable (e.g. Wasm failed to load) and must be replaced;
+ * - `run`: the run failed to start or stopped; the worker can start another;
+ * - `command`: one command was rejected (e.g. malformed); nothing else changed.
+ */
+export type WorkerErrorKind = 'worker' | 'run' | 'command';
+
 /** Messages the worker sends to the UI. */
 export type WorkerEvent =
   | { readonly type: 'ready'; readonly producerVersion: string }
@@ -42,13 +50,11 @@ export type WorkerEvent =
     }
   | {
       readonly type: 'error';
+      readonly kind: WorkerErrorKind;
       readonly message: string;
       /** Command that failed, when the error came from handling one. */
       readonly command?: WorkerCommandType;
-      /**
-       * Run the error belongs to: the one that failed, or the one a failed
-       * `start` was for. Absent when it concerns the whole worker (e.g. loading).
-       */
+      /** For `run` errors: the run that failed, or the one a failed `start` was for. */
       readonly runId?: number;
     }
   | {

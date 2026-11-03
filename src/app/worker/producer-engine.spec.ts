@@ -504,7 +504,12 @@ describe('ProducerEngine', () => {
     engine.start(1, settings);
     time.advance(settings.batchIntervalMs);
 
-    expect(events).toContainEqual({ type: 'error', message: 'wasm trapped', runId: 1 });
+    expect(events).toContainEqual({
+      type: 'error',
+      kind: 'run',
+      message: 'wasm trapped',
+      runId: 1,
+    });
     expect(engine.status).toBe('finished');
     expect(time.activeTimers).toBe(0);
   });

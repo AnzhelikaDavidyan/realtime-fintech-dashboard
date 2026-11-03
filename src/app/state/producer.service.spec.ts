@@ -279,24 +279,50 @@ describe('ProducerService', () => {
   describe('errors', () => {
     it('shows a load failure and marks the producer unusable', () => {
       const { service, worker } = setup();
-      worker().emit({ type: 'error', message: 'Could not download the market engine' });
+      worker().emit({
+        type: 'error',
+        kind: 'worker',
+        message: 'Could not download the market engine',
+      });
       expect(service.status()).toBe('error');
       expect(service.error()).toBe('Could not download the market engine');
     });
 
-    it('shows a failed command without changing the status', () => {
+    // Regression: an error without a command (e.g. an unknown message) used to
+    // mark the worker unusable, and other command errors left a message behind
+    // that later showed up in an unrelated error banner.
+    it.each([undefined, 'pause'] as const)(
+      'logs a rejected command (%s) without changing the status or the error',
+      (command) => {
+        const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+        const { service, worker } = setup();
+        worker().emit({ type: 'status', status: 'running', runId: 1 });
+        worker().emit({ type: 'error', kind: 'command', message: 'Unknown command', command });
+
+        expect(service.status()).toBe('running');
+        expect(service.error()).toBeNull();
+        expect(service.runOutcome()).toBe('started');
+        expect(log).toHaveBeenCalledWith(
+          `The market data worker rejected ${command ?? 'a message'}: Unknown command`,
+        );
+        log.mockRestore();
+      },
+    );
+
+    it('fails a run that stops after it started', () => {
       const { service, worker } = setup();
       worker().emit({ type: 'status', status: 'running', runId: 1 });
-      // The run already started, so a failed command only shows its message.
-      worker().emit({ type: 'error', message: 'bad settings', command: 'start' });
-      expect(service.status()).toBe('running');
-      expect(service.error()).toBe('bad settings');
+      worker().emit({ type: 'error', kind: 'run', message: 'wasm trapped', runId: 1 });
+      expect(service.status()).toBe('error');
+      expect(service.runOutcome()).toBe('failed');
+      expect(service.error()).toBe('wasm trapped');
     });
 
     it('marks the producer unusable when the run fails to start', () => {
       const { service, worker } = setup();
       worker().emit({
         type: 'error',
+        kind: 'run',
         message: 'Generator rejected the seed',
         command: 'start',
         runId: 1,
@@ -307,10 +333,15 @@ describe('ProducerService', () => {
 
     it('keeps the load failure message when queued commands then fail too', () => {
       const { service, worker } = setup();
-      worker().emit({ type: 'error', message: 'Could not download the market engine' });
+      worker().emit({
+        type: 'error',
+        kind: 'worker',
+        message: 'Could not download the market engine',
+      });
       // Already unusable, so this repeat of the cause does not replace the first message.
       worker().emit({
         type: 'error',
+        kind: 'worker',
         message: 'The market engine is unavailable: Could not download the market engine',
         command: 'start',
       });
@@ -319,7 +350,7 @@ describe('ProducerService', () => {
 
     it('keeps showing why a run ended', () => {
       const { service, worker } = setup();
-      worker().emit({ type: 'error', message: 'wasm trapped' });
+      worker().emit({ type: 'error', kind: 'run', message: 'wasm trapped', runId: 1 });
       worker().emit({ type: 'status', status: 'finished', runId: 1 });
       expect(service.status()).toBe('finished');
       expect(service.error()).toBe('wasm trapped');
@@ -334,7 +365,13 @@ describe('ProducerService', () => {
 
     it('clears an old error when a new run starts', () => {
       const { service, worker } = setup();
-      worker().emit({ type: 'error', message: 'bad settings', command: 'start' });
+      worker().emit({
+        type: 'error',
+        kind: 'run',
+        message: 'bad settings',
+        command: 'start',
+        runId: 1,
+      });
       service.apply({ instrumentCount: 2 });
       expect(service.error()).toBeNull();
     });
@@ -344,7 +381,7 @@ describe('ProducerService', () => {
     it('replaces the worker and restarts with the active settings', () => {
       const { service, workers } = setup();
       service.apply({ instrumentCount: 4 });
-      workers[0].emit({ type: 'error', message: 'boom' });
+      workers[0].emit({ type: 'error', kind: 'worker', message: 'boom' });
 
       service.retry();
 
@@ -411,7 +448,13 @@ describe('ProducerService', () => {
       expect(service.runOutcome()).toBe('pending');
       expect(service.status()).toBe('paused');
 
-      worker().emit({ type: 'error', message: 'bad settings', command: 'start', runId: 2 });
+      worker().emit({
+        type: 'error',
+        kind: 'run',
+        message: 'bad settings',
+        command: 'start',
+        runId: 2,
+      });
       expect(service.runOutcome()).toBe('failed');
       expect(service.status()).toBe('error');
     });
@@ -420,7 +463,7 @@ describe('ProducerService', () => {
     it('does not let an error of the old run fail the new one', () => {
       const { service, worker } = setup();
       service.apply({ seed: 2 });
-      worker().emit({ type: 'error', message: 'wasm trapped', runId: 1 });
+      worker().emit({ type: 'error', kind: 'run', message: 'wasm trapped', runId: 1 });
       worker().emit({ type: 'status', status: 'finished', runId: 1 });
       worker().emit({ type: 'status', status: 'running', runId: 2 });
 
@@ -432,7 +475,11 @@ describe('ProducerService', () => {
     it('still reports errors about the whole worker', () => {
       const { service, worker } = setup();
       service.apply({ seed: 2 });
-      worker().emit({ type: 'error', message: 'Could not download the market engine' });
+      worker().emit({
+        type: 'error',
+        kind: 'worker',
+        message: 'Could not download the market engine',
+      });
       expect(service.status()).toBe('error');
       expect(service.error()).toBe('Could not download the market engine');
     });
@@ -470,14 +517,22 @@ describe('ProducerService', () => {
 
     it('fails when the start command fails', () => {
       const { service, worker } = setup();
-      worker().emit({ type: 'error', message: 'Bad settings', command: 'start', runId: 1 });
+      worker().emit({
+        type: 'error',
+        kind: 'run',
+        message: 'Bad settings',
+        command: 'start',
+        runId: 1,
+      });
       expect(service.runOutcome()).toBe('failed');
     });
 
     it('is not failed by an error from another command', () => {
       const { service, worker } = setup();
-      worker().emit({ type: 'error', message: 'Not running', command: 'pause' });
+      vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      worker().emit({ type: 'error', kind: 'command', message: 'Not running', command: 'pause' });
       expect(service.runOutcome()).toBe('pending');
+      vi.mocked(console.error).mockRestore();
     });
 
     it('fails when the worker cannot load or crashes, even after the run started', () => {

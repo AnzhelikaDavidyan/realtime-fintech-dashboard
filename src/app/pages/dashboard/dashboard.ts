@@ -63,7 +63,11 @@ export class Dashboard {
   );
   /** The worker's message as a sentence (it may lack a final full stop). */
   protected readonly errorMessage = computed(() => {
-    const message = this.producer.error() ?? 'The market data worker could not start.';
+    const fallback =
+      this.producer.status() === 'finished'
+        ? 'The run has ended.'
+        : 'The market data worker could not start.';
+    const message = this.producer.error() ?? fallback;
     return /[.!?]$/.test(message) ? message : `${message}.`;
   });
 

@@ -96,7 +96,13 @@ describe('SettingsApply', () => {
   it('explains why the run could not start', () => {
     const { service, worker, wait, toasts } = setup();
     service.apply(edited);
-    worker().emit({ type: 'error', message: 'Generator rejected the settings', command: 'start' });
+    worker().emit({
+      type: 'error',
+      kind: 'run',
+      message: 'Generator rejected the settings',
+      command: 'start',
+      runId: 2,
+    });
     wait(MIN_APPLYING_MS);
 
     expect(service.applying()).toBe(false);
