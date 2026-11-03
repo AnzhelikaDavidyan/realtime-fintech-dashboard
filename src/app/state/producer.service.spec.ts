@@ -33,8 +33,8 @@ function setup() {
   TestBed.configureTestingModule({ providers: [provideFakeProducerWorker(workers)] });
   const service = TestBed.inject(ProducerService);
   const worker = () => workers.at(-1)!;
-  /** Commands sent after the initial default run (init + start). */
-  const sentSinceStartup = () => worker().sent.slice(2);
+  /** Commands sent after the initial default run's `start`. */
+  const sentSinceStartup = () => worker().sent.slice(1);
   return { service, workers, worker, sentSinceStartup };
 }
 
@@ -46,8 +46,7 @@ describe('ProducerService', () => {
 
       expect(workers).toHaveLength(1);
       expect(workers[0].sent).toEqual([
-        { type: 'init', settings: DEFAULT_PRODUCER_SETTINGS },
-        { type: 'start', runId: 1 },
+        { type: 'start', runId: 1, settings: DEFAULT_PRODUCER_SETTINGS },
       ]);
       expect(service.runId()).toBe(1);
       expect(service.activeSettings()).toEqual(DEFAULT_PRODUCER_SETTINGS);
@@ -68,12 +67,8 @@ describe('ProducerService', () => {
         service.apply({ instrumentCount: expected });
         expect(service.runId()).toBe(expected);
       }
-      const starts = sentSinceStartup().filter((c) => c.type === 'start');
-      expect(starts).toEqual([
-        { type: 'start', runId: 2 },
-        { type: 'start', runId: 3 },
-        { type: 'start', runId: 4 },
-      ]);
+      const starts = sentSinceStartup().map((c) => (c.type === 'start' ? c.runId : c.type));
+      expect(starts).toEqual([2, 3, 4]);
     });
 
     it('clears the rows immediately, before the new run reports anything', () => {
@@ -87,20 +82,23 @@ describe('ProducerService', () => {
 
     it('starts generation even when the producer is paused', () => {
       const { service, worker, sentSinceStartup } = setup();
-      worker().emit({ type: 'status', status: 'running' });
+      worker().emit({ type: 'status', status: 'running', runId: 1 });
       service.pause();
-      worker().emit({ type: 'status', status: 'paused' });
+      worker().emit({ type: 'status', status: 'paused', runId: 1 });
 
       service.apply({ instrumentCount: 2 });
 
       // A fresh `start`, not a `resume`: the new run runs whatever state the old one was in.
       expect(sentSinceStartup()).toEqual([
         { type: 'pause' },
-        { type: 'init', settings: { ...DEFAULT_PRODUCER_SETTINGS, instrumentCount: 2 } },
-        { type: 'start', runId: 2 },
+        {
+          type: 'start',
+          runId: 2,
+          settings: { ...DEFAULT_PRODUCER_SETTINGS, instrumentCount: 2 },
+        },
       ]);
 
-      worker().emit({ type: 'status', status: 'running' });
+      worker().emit({ type: 'status', status: 'running', runId: 2 });
       worker().emit(snapshot(2, [row(0, 1), row(1, 1)]));
       expect(service.status()).toBe('running');
       expect(service.rows()).toHaveLength(2);
@@ -112,7 +110,7 @@ describe('ProducerService', () => {
 
       const settings = { ...DEFAULT_PRODUCER_SETTINGS, instrumentCount: 3, updatesPerBatch: 1_000 };
       expect(service.activeSettings()).toEqual(settings);
-      expect(sentSinceStartup()[0]).toEqual({ type: 'init', settings });
+      expect(sentSinceStartup()[0]).toEqual({ type: 'start', runId: 2, settings });
     });
   });
 
@@ -137,14 +135,14 @@ describe('ProducerService', () => {
   describe('pause and resume', () => {
     it('sends pause and resume and follows the status the worker reports', () => {
       const { service, worker, sentSinceStartup } = setup();
-      worker().emit({ type: 'status', status: 'running' });
+      worker().emit({ type: 'status', status: 'running', runId: 1 });
 
       service.pause();
-      worker().emit({ type: 'status', status: 'paused' });
+      worker().emit({ type: 'status', status: 'paused', runId: 1 });
       expect(service.status()).toBe('paused');
 
       service.resume();
-      worker().emit({ type: 'status', status: 'running' });
+      worker().emit({ type: 'status', status: 'running', runId: 1 });
       expect(service.status()).toBe('running');
 
       expect(sentSinceStartup()).toEqual([{ type: 'pause' }, { type: 'resume' }]);
@@ -154,7 +152,7 @@ describe('ProducerService', () => {
       const { service, worker } = setup();
       worker().emit(snapshot(1, [row(0, 5)]));
       service.pause();
-      worker().emit({ type: 'status', status: 'paused' });
+      worker().emit({ type: 'status', status: 'paused', runId: 1 });
       service.resume();
 
       expect(service.runId()).toBe(1);
@@ -288,22 +286,24 @@ describe('ProducerService', () => {
 
     it('shows a failed command without changing the status', () => {
       const { service, worker } = setup();
-      worker().emit({ type: 'status', status: 'running' });
+      worker().emit({ type: 'status', status: 'running', runId: 1 });
       // The run already started, so a failed command only shows its message.
       worker().emit({ type: 'error', message: 'bad settings', command: 'start' });
       expect(service.status()).toBe('running');
       expect(service.error()).toBe('bad settings');
     });
 
-    it.each(['init', 'start'] as const)(
-      'marks the producer unusable when the run fails to start (%s)',
-      (command) => {
-        const { service, worker } = setup();
-        worker().emit({ type: 'error', message: 'Generator rejected the seed', command });
-        expect(service.status()).toBe('error');
-        expect(service.error()).toBe('Generator rejected the seed');
-      },
-    );
+    it('marks the producer unusable when the run fails to start', () => {
+      const { service, worker } = setup();
+      worker().emit({
+        type: 'error',
+        message: 'Generator rejected the seed',
+        command: 'start',
+        runId: 1,
+      });
+      expect(service.status()).toBe('error');
+      expect(service.error()).toBe('Generator rejected the seed');
+    });
 
     it('keeps the load failure message when queued commands then fail too', () => {
       const { service, worker } = setup();
@@ -320,7 +320,7 @@ describe('ProducerService', () => {
     it('keeps showing why a run ended', () => {
       const { service, worker } = setup();
       worker().emit({ type: 'error', message: 'wasm trapped' });
-      worker().emit({ type: 'status', status: 'finished' });
+      worker().emit({ type: 'status', status: 'finished', runId: 1 });
       expect(service.status()).toBe('finished');
       expect(service.error()).toBe('wasm trapped');
     });
@@ -351,8 +351,11 @@ describe('ProducerService', () => {
       expect(workers).toHaveLength(2);
       expect(workers[0].terminated).toBe(true);
       expect(workers[1].sent).toEqual([
-        { type: 'init', settings: { ...DEFAULT_PRODUCER_SETTINGS, instrumentCount: 4 } },
-        { type: 'start', runId: 3 },
+        {
+          type: 'start',
+          runId: 3,
+          settings: { ...DEFAULT_PRODUCER_SETTINGS, instrumentCount: 4 },
+        },
       ]);
       expect(service.status()).toBe('starting');
       expect(service.error()).toBeNull();
@@ -367,15 +370,18 @@ describe('ProducerService', () => {
       expect(workers).toHaveLength(2);
       expect(workers[0].terminated).toBe(true);
       expect(workers[1].sent).toEqual([
-        { type: 'init', settings: { ...DEFAULT_PRODUCER_SETTINGS, instrumentCount: 2 } },
-        { type: 'start', runId: 2 },
+        {
+          type: 'start',
+          runId: 2,
+          settings: { ...DEFAULT_PRODUCER_SETTINGS, instrumentCount: 2 },
+        },
       ]);
       expect(service.status()).toBe('starting');
     });
 
     it('keeps the worker when Apply follows a run that only stopped', () => {
       const { service, workers } = setup();
-      workers[0].emit({ type: 'status', status: 'finished' });
+      workers[0].emit({ type: 'status', status: 'finished', runId: 1 });
       service.apply({ instrumentCount: 2 });
       expect(workers).toHaveLength(1);
     });
@@ -383,7 +389,7 @@ describe('ProducerService', () => {
     it('ignores anything the replaced worker still sends', () => {
       const { service, workers } = setup();
       service.retry();
-      workers[0].emit({ type: 'status', status: 'paused' });
+      workers[0].emit({ type: 'status', status: 'paused', runId: 1 });
       workers[0].emit(snapshot(2, [row(0, 9)]));
       workers[0].crash('late crash');
 
@@ -393,39 +399,78 @@ describe('ProducerService', () => {
     });
   });
 
+  describe('events from another run', () => {
+    // Regression: the worker's answer to resuming run 1 confirmed run 2, so a
+    // run 2 that then failed to start showed as running with an empty table.
+    it('does not let the old run confirm the new one', () => {
+      const { service, worker } = setup();
+      worker().emit({ type: 'status', status: 'paused', runId: 1 });
+      service.resume();
+      service.apply({ seed: 2 });
+      worker().emit({ type: 'status', status: 'running', runId: 1 });
+      expect(service.runOutcome()).toBe('pending');
+      expect(service.status()).toBe('paused');
+
+      worker().emit({ type: 'error', message: 'bad settings', command: 'start', runId: 2 });
+      expect(service.runOutcome()).toBe('failed');
+      expect(service.status()).toBe('error');
+    });
+
+    // Regression: a batch error of the replaced run marked the new run failed.
+    it('does not let an error of the old run fail the new one', () => {
+      const { service, worker } = setup();
+      service.apply({ seed: 2 });
+      worker().emit({ type: 'error', message: 'wasm trapped', runId: 1 });
+      worker().emit({ type: 'status', status: 'finished', runId: 1 });
+      worker().emit({ type: 'status', status: 'running', runId: 2 });
+
+      expect(service.runOutcome()).toBe('started');
+      expect(service.status()).toBe('running');
+      expect(service.error()).toBeNull();
+    });
+
+    it('still reports errors about the whole worker', () => {
+      const { service, worker } = setup();
+      service.apply({ seed: 2 });
+      worker().emit({ type: 'error', message: 'Could not download the market engine' });
+      expect(service.status()).toBe('error');
+      expect(service.error()).toBe('Could not download the market engine');
+    });
+  });
+
   describe('run outcome', () => {
     it('is pending until the worker confirms the run is running', () => {
       const { service, worker } = setup();
       expect(service.runOutcome()).toBe('pending');
       worker().emit({ type: 'ready', producerVersion: '1' });
       expect(service.runOutcome()).toBe('pending');
-      worker().emit({ type: 'status', status: 'running' });
+      worker().emit({ type: 'status', status: 'running', runId: 1 });
       expect(service.runOutcome()).toBe('started');
     });
 
     it('is not confirmed by a paused status from an earlier command', () => {
       const { service, worker } = setup();
-      worker().emit({ type: 'status', status: 'paused' });
+      worker().emit({ type: 'status', status: 'paused', runId: 1 });
       expect(service.runOutcome()).toBe('pending');
     });
 
     it('goes back to pending for every new run', () => {
       const { service, worker } = setup();
-      worker().emit({ type: 'status', status: 'running' });
+      worker().emit({ type: 'status', status: 'running', runId: 1 });
       service.apply({ instrumentCount: 3 });
       expect(service.runOutcome()).toBe('pending');
     });
 
     it('stays started when the run is later paused', () => {
       const { service, worker } = setup();
-      worker().emit({ type: 'status', status: 'running' });
-      worker().emit({ type: 'status', status: 'paused' });
+      worker().emit({ type: 'status', status: 'running', runId: 1 });
+      worker().emit({ type: 'status', status: 'paused', runId: 1 });
       expect(service.runOutcome()).toBe('started');
     });
 
-    it.each(['init', 'start'] as const)('fails when the %s command fails', (command) => {
+    it('fails when the start command fails', () => {
       const { service, worker } = setup();
-      worker().emit({ type: 'error', message: 'Bad settings', command });
+      worker().emit({ type: 'error', message: 'Bad settings', command: 'start', runId: 1 });
       expect(service.runOutcome()).toBe('failed');
     });
 
@@ -437,7 +482,7 @@ describe('ProducerService', () => {
 
     it('fails when the worker cannot load or crashes, even after the run started', () => {
       const { service, worker } = setup();
-      worker().emit({ type: 'status', status: 'running' });
+      worker().emit({ type: 'status', status: 'running', runId: 1 });
       worker().crash('Script error');
       expect(service.runOutcome()).toBe('failed');
     });

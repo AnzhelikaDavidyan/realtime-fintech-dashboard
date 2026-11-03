@@ -33,11 +33,11 @@ describe('SettingsApply', () => {
   afterEach(() => vi.useRealTimers());
 
   it('is applying until the new run has started and the minimum time has passed', () => {
-    const { service, worker, wait } = setup();
+    const { service, worker, wait, producer } = setup();
     service.apply(edited);
     expect(service.applying()).toBe(true);
 
-    worker().emit({ type: 'status', status: 'running' });
+    worker().emit({ type: 'status', status: 'running', runId: producer.runId() });
     wait(MIN_APPLYING_MS - 1);
     expect(service.applying()).toBe(true);
     wait(1);
@@ -45,13 +45,13 @@ describe('SettingsApply', () => {
   });
 
   it('does not wait any longer when the run takes longer than the minimum to start', () => {
-    const { service, worker, wait } = setup();
+    const { service, worker, wait, producer } = setup();
     service.apply(edited);
     // Time alone never ends applying; only the worker's 'running' does.
     wait(MIN_APPLYING_MS * 3);
     expect(service.applying()).toBe(true);
 
-    worker().emit({ type: 'status', status: 'running' });
+    worker().emit({ type: 'status', status: 'running', runId: producer.runId() });
     wait(0);
     expect(service.applying()).toBe(false);
   });
@@ -64,9 +64,9 @@ describe('SettingsApply', () => {
   });
 
   it('announces the started run and highlights it briefly', () => {
-    const { service, worker, wait, toasts, notifications } = setup();
+    const { service, worker, wait, toasts, notifications, producer } = setup();
     service.apply(edited);
-    worker().emit({ type: 'status', status: 'running' });
+    worker().emit({ type: 'status', status: 'running', runId: producer.runId() });
     wait(MIN_APPLYING_MS);
 
     expect(toasts()).toEqual([
@@ -126,25 +126,22 @@ describe('SettingsApply', () => {
     // runId 3: the failed Apply used run 2.
     notifications.toasts()[0].action!.run();
     expect(workers).toHaveLength(2);
-    expect(worker().sent).toEqual([
-      { type: 'init', settings: edited },
-      { type: 'start', runId: 3 },
-    ]);
+    expect(worker().sent).toEqual([{ type: 'start', runId: 3, settings: edited }]);
     expect(service.applying()).toBe(true);
 
-    worker().emit({ type: 'status', status: 'running' });
+    worker().emit({ type: 'status', status: 'running', runId: producer.runId() });
     wait(MIN_APPLYING_MS);
     expect(producer.runId()).toBe(3);
     expect(toasts().map((t) => t.kind)).toEqual(['success']);
   });
 
   it('applies on a fresh worker after the producer failed, instead of waiting forever', () => {
-    const { service, workers, worker, wait, toasts } = setup();
+    const { service, workers, worker, wait, toasts, producer } = setup();
     workers[0].crash('Script error');
 
     service.apply(edited);
     expect(workers).toHaveLength(2);
-    worker().emit({ type: 'status', status: 'running' });
+    worker().emit({ type: 'status', status: 'running', runId: producer.runId() });
     wait(MIN_APPLYING_MS);
 
     expect(service.applying()).toBe(false);
@@ -154,19 +151,16 @@ describe('SettingsApply', () => {
   it('ignores Apply while a run is still starting', () => {
     const { service, worker } = setup();
     service.apply(edited);
-    // The second Apply is ignored while run 2 is starting, so only one init and start are sent.
+    // The second Apply is ignored while run 2 is starting, so only one start is sent.
     service.apply({ ...edited, instrumentCount: 7 });
-    expect(worker().sent.slice(2)).toEqual([
-      { type: 'init', settings: edited },
-      { type: 'start', runId: 2 },
-    ]);
+    expect(worker().sent.slice(1)).toEqual([{ type: 'start', runId: 2, settings: edited }]);
   });
 
   it('reports nothing when another run replaced the one it was waiting for', () => {
     const { service, producer, worker, wait, toasts } = setup();
     service.apply(edited);
     producer.retry(); // e.g. the Retry button in the header
-    worker().emit({ type: 'status', status: 'running' });
+    worker().emit({ type: 'status', status: 'running', runId: producer.runId() });
     wait(MIN_APPLYING_MS);
 
     // The run that started is not the one Apply asked for, so there's no toast.

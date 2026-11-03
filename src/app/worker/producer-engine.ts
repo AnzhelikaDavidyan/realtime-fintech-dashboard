@@ -85,12 +85,21 @@ export class ProducerEngine {
   }
 
   /**
-   * Starts a fresh run, discarding any previous run's state. The new generator
-   * is created first, so if that fails the current run is left untouched.
+   * Starts a fresh run, discarding any previous run's state. If the new
+   * generator cannot be created, the previous run is finished anyway: the UI
+   * has already moved on to the new run, so nobody would see the old one.
    */
   start(runId: number, settings: Partial<ProducerSettings>): void {
     const next = normalizeProducerSettings(settings);
-    const generator = this.deps.createGenerator(next.seed, next.instrumentCount);
+    let generator: BatchGenerator;
+    try {
+      generator = this.deps.createGenerator(next.seed, next.instrumentCount);
+    } catch (error) {
+      if (this.state !== 'idle') {
+        this.finish();
+      }
+      throw error;
+    }
 
     this.stopTimers();
     this.releaseGenerator();
@@ -166,6 +175,7 @@ export class ProducerEngine {
       this.deps.emit({
         type: 'error',
         message: error instanceof Error ? error.message : String(error),
+        runId: this.runId,
       });
       this.finish();
     }
@@ -223,6 +233,6 @@ export class ProducerEngine {
 
   private setStatus(status: WorkerStatus): void {
     this.state = status;
-    this.deps.emit({ type: 'status', status });
+    this.deps.emit({ type: 'status', status, runId: this.runId });
   }
 }

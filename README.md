@@ -70,20 +70,21 @@ Before committing, run `npm run format:check`, `npm run lint`, `npx ng test --wa
 │          ▼                                                 │ Array, │    pure pipes for formatting        │
 │  encodeMetrics → Float64Array (transferred, not copied)    │ trans- │                                     │
 │                                                            │ ferred │  Settings → ProducerService.apply() │
-│  ProducerEngine: idle → running ⇄ paused → finished        │ ◄───── │    init + start commands, runId     │
+│  ProducerEngine: idle → running ⇄ paused → finished        │ ◄───── │    start command: runId, settings   │
 │  ProducerWorkerHost: loads Wasm, queues early commands     │ command│                                     │
 └────────────────────────────────────────────────────────────┘        └─────────────────────────────────────┘
 ```
 
 1. The worker loads the Wasm module and posts `ready`, or an `error` the UI shows with **Retry**.
-2. `init` stores settings and `start` begins a run tagged with a `runId`. Every batch interval the
+2. `start` begins a run with its settings, tagged with a `runId`. Every batch interval the
    engine asks the generator for `updatesPerBatch` updates of 7 integers each (instrument, bid,
    ask, bid and ask quantity, trade price and quantity, all in ticks and lots) and folds them into
    per-instrument metrics: bid, ask, spread, order-book imbalance, last price, volume and VWAP.
 3. At most every 100 ms, and only if a batch arrived since the last one, the engine packs all
    metrics into one `Float64Array` and transfers it to the UI.
-4. `ProducerService` ignores snapshots from older runs, decodes the rest into a signal, and the
-   dashboard re-renders from it.
+4. Snapshots, statuses and run errors carry the `runId` too. `ProducerService` ignores those from
+   older runs, so a replaced run can neither show stale data nor confirm or fail the new one. It
+   decodes the snapshots into a signal, and the dashboard re-renders from it.
 5. While the page is hidden, `ProducerService` sends `pause-snapshots`: the engine keeps generating
    but posts nothing. `resume-snapshots` on return sends the latest state at once.
 

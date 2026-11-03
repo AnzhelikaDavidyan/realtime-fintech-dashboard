@@ -22,8 +22,8 @@ function setup() {
   const status = () => el.querySelector('[role="status"]') as HTMLElement;
   const button = () => el.querySelector('button') as HTMLButtonElement;
   const text = (node: HTMLElement) => node.textContent?.replace(/\s+/g, ' ').trim();
-  /** Commands sent after the default run started (init + start). */
-  const sent = () => worker().sent.slice(2);
+  /** Commands sent after the default run's `start`. */
+  const sent = () => worker().sent.slice(1);
   return { fixture, workers, worker, emit, status, button, text, sent };
 }
 
@@ -37,7 +37,7 @@ describe('ProducerControls', () => {
 
   it('shows the nominal rate while running and pauses on click', async () => {
     const { emit, status, button, text, sent } = setup();
-    await emit({ type: 'status', status: 'running' });
+    await emit({ type: 'status', status: 'running', runId: 1 });
     expect(text(status())).toBe('Running · 200 upd/s');
     expect(status().querySelector('img')?.getAttribute('src')).toBe('icons/status-running.svg');
 
@@ -47,7 +47,7 @@ describe('ProducerControls', () => {
 
   it('offers Resume while paused', async () => {
     const { emit, status, button, text, sent } = setup();
-    await emit({ type: 'status', status: 'paused' });
+    await emit({ type: 'status', status: 'paused', runId: 1 });
     expect(text(status())).toBe('Paused');
     expect(text(button())).toBe('▶ Resume');
     expect(button().className).toContain('action--resume');
@@ -70,7 +70,7 @@ describe('ProducerControls', () => {
   it('treats a run that ended as an error with Retry', async () => {
     const { emit, status, button, text } = setup();
     // Runs only finish on their own after a failure (e.g. Wasm trapped), so it shows as an error.
-    await emit({ type: 'status', status: 'finished' });
+    await emit({ type: 'status', status: 'finished', runId: 1 });
     expect(text(status())).toBe('Error');
     expect(text(button())).toBe('↻ Retry');
   });

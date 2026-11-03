@@ -18,12 +18,7 @@ import {
   normalizeProducerSettings,
   ProducerSettings,
 } from '../core/producer-settings';
-import {
-  WorkerCommand,
-  WorkerCommandType,
-  WorkerEvent,
-  WorkerStatus,
-} from '../core/worker-protocol';
+import { WorkerCommand, WorkerEvent, WorkerStatus } from '../core/worker-protocol';
 
 /** The part of `Worker` the service uses, so tests can pass a fake. */
 export interface ProducerWorker {
@@ -57,8 +52,9 @@ export type RunOutcome = 'pending' | 'started' | 'failed';
  * App-wide access to the market data producer.
  *
  * Creates the Web Worker once and starts a run with the default settings.
- * Every `apply` or `retry` starts a new run with a new id; snapshots from any
- * earlier run are ignored, so the screen never shows stale data.
+ * Every `apply` or `retry` starts a new run with a new id; snapshots, statuses
+ * and errors from any earlier run are ignored, so the screen never shows stale
+ * data and an old run cannot confirm or fail the new one.
  *
  * While the page is hidden the worker keeps generating but sends no snapshots,
  * so a background tab does no decoding or rendering work.
@@ -154,8 +150,7 @@ export class ProducerService {
     this._totalUpdates.set(0);
     this._error.set(null);
     this._runOutcome.set('pending');
-    this.send({ type: 'init', settings });
-    this.send({ type: 'start', runId });
+    this.send({ type: 'start', runId, settings });
   }
 
   private replaceWorker(): void {
@@ -185,25 +180,27 @@ export class ProducerService {
   }
 
   private handle(event: WorkerEvent): void {
+    const fromOtherRun = isFromOtherRun(event, this._runId());
     logMessage('received from worker', event, {
       currentRunId: this._runId(),
-      ...(event.type === 'snapshot' && { ignored: event.runId !== this._runId() }),
+      ...(fromOtherRun && { ignored: true }),
     });
+    if (fromOtherRun) {
+      return;
+    }
     switch (event.type) {
       case 'ready':
         break;
       case 'status':
         this._status.set(event.status);
-        // Every `start` answers with `running`, so the first one confirms the run.
+        // Every `start` answers with `running`, so the first one of this run confirms it.
         if (event.status === 'running' && this._runOutcome() === 'pending') {
           this._runOutcome.set('started');
         }
         break;
       case 'snapshot':
-        if (event.runId === this._runId()) {
-          this._rows.set(decodeMetrics(event.metrics));
-          this._totalUpdates.set(event.totalUpdates);
-        }
+        this._rows.set(decodeMetrics(event.metrics));
+        this._totalUpdates.set(event.totalUpdates);
         break;
       case 'error':
         // Not tied to a command: Wasm failed to load or the run itself failed,
@@ -213,7 +210,7 @@ export class ProducerService {
         } else if (this._status() !== 'error') {
           // Once the worker is unusable, the first message says why; the errors
           // for commands that were waiting would only repeat it.
-          if (isRunCommand(event.command) && this._runOutcome() === 'pending') {
+          if (event.command === 'start' && this._runOutcome() === 'pending') {
             // The run never started, so no data will come until `retry`.
             this.fail(event.message);
           } else {
@@ -249,7 +246,19 @@ function logMessage(
   console.log(`__________________${type}__________________`, direction, { ...fields, ...extra });
 }
 
-/** Commands that set up and start a run; if one fails, the run never starts. */
-function isRunCommand(command: WorkerCommandType): boolean {
-  return command === 'init' || command === 'start';
+/**
+ * True for an event about a run other than the current one, e.g. a late
+ * snapshot, or the `running` answer to resuming the run an Apply replaced.
+ * Errors without a run id concern the whole worker and always count.
+ */
+function isFromOtherRun(event: WorkerEvent, currentRunId: number): boolean {
+  switch (event.type) {
+    case 'snapshot':
+    case 'status':
+      return event.runId !== currentRunId;
+    case 'error':
+      return event.runId !== undefined && event.runId !== currentRunId;
+    default:
+      return false;
+  }
 }

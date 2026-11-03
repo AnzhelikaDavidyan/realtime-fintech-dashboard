@@ -1,4 +1,3 @@
-import { ProducerSettings } from '../core/producer-settings';
 import { WorkerCommand, WorkerCommandType, WorkerEvent } from '../core/worker-protocol';
 import { ProducerWasm } from './load-producer-wasm';
 import { Clock, ProducerEngine, Scheduler } from './producer-engine';
@@ -25,7 +24,6 @@ interface SnapshotPause {
 }
 
 const COMMAND_TYPES: ReadonlySet<string> = new Set<WorkerCommandType>([
-  'init',
   'start',
   'pause',
   'resume',
@@ -44,7 +42,6 @@ export class ProducerWorkerHost {
   readonly loaded: Promise<void>;
   private engine: ProducerEngine | null = null;
   private loadError: string | null = null;
-  private settings: Partial<ProducerSettings> = {};
   private queued: WorkerCommand[] = [];
   /** Engine state when snapshots were paused, for the dev log on resume. */
   private snapshotsPausedAt: SnapshotPause | null = null;
@@ -66,6 +63,7 @@ export class ProducerWorkerHost {
         type: 'error',
         message: `The market engine is unavailable: ${this.loadError}`,
         command: data.type,
+        ...runIdOf(data),
       });
       return;
     }
@@ -102,11 +100,8 @@ export class ProducerWorkerHost {
   private handle(engine: ProducerEngine, command: WorkerCommand): void {
     try {
       switch (command.type) {
-        case 'init':
-          this.settings = command.settings;
-          break;
         case 'start':
-          engine.start(command.runId, this.settings);
+          engine.start(command.runId, command.settings);
           break;
         case 'pause':
           engine.pause();
@@ -133,6 +128,7 @@ export class ProducerWorkerHost {
         type: 'error',
         message: error instanceof Error ? error.message : String(error),
         command: command.type,
+        ...runIdOf(command),
       });
     }
   }
@@ -215,10 +211,18 @@ function isWorkerCommand(data: unknown): data is WorkerCommand {
     return false;
   }
   if (type === 'start') {
-    return 'runId' in data && typeof data.runId === 'number';
-  }
-  if (type === 'init') {
-    return 'settings' in data && typeof data.settings === 'object' && data.settings !== null;
+    return (
+      'runId' in data &&
+      typeof data.runId === 'number' &&
+      'settings' in data &&
+      typeof data.settings === 'object' &&
+      data.settings !== null
+    );
   }
   return true;
+}
+
+/** The run a failed command was for: only `start` names one. */
+function runIdOf(command: WorkerCommand): { runId?: number } {
+  return command.type === 'start' ? { runId: command.runId } : {};
 }

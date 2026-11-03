@@ -70,11 +70,12 @@ describe('ProducerWorkerHost', () => {
     it('answers commands after a failed load with an error naming the command', async () => {
       const { host, ofType } = setup(() => Promise.reject(new Error('boom')));
       await host.loaded;
-      host.receive({ type: 'start', runId: 1 });
+      host.receive({ type: 'start', runId: 1, settings: {} });
       expect(ofType('error').at(-1)).toEqual({
         type: 'error',
         message: 'The market engine is unavailable: boom',
         command: 'start',
+        runId: 1,
       });
     });
   });
@@ -83,8 +84,7 @@ describe('ProducerWorkerHost', () => {
     it('queues commands sent before Wasm is ready and runs them afterwards', async () => {
       const wasm = deferred<ProducerWasm>();
       const { host, messages, ofType } = setup(() => wasm.promise);
-      host.receive({ type: 'init', settings: { instrumentCount: 2 } });
-      host.receive({ type: 'start', runId: 5 });
+      host.receive({ type: 'start', runId: 5, settings: { instrumentCount: 2 } });
       expect(messages()).toEqual([]);
 
       wasm.resolve(fakeWasm);
@@ -97,7 +97,7 @@ describe('ProducerWorkerHost', () => {
     it('routes start, pause, resume and finish to the engine', async () => {
       const { host, ofType } = setup();
       await host.loaded;
-      host.receive({ type: 'start', runId: 1 });
+      host.receive({ type: 'start', runId: 1, settings: {} });
       host.receive({ type: 'pause' });
       host.receive({ type: 'resume' });
       host.receive({ type: 'finish' });
@@ -112,7 +112,7 @@ describe('ProducerWorkerHost', () => {
     it('routes pause-snapshots and resume-snapshots to the engine', async () => {
       const { host, time, ofType } = setup();
       await host.loaded;
-      host.receive({ type: 'start', runId: 1 });
+      host.receive({ type: 'start', runId: 1, settings: {} });
       host.receive({ type: 'pause-snapshots' });
       time.advance(1_000);
       expect(ofType('snapshot')).toHaveLength(0);
@@ -127,8 +127,11 @@ describe('ProducerWorkerHost', () => {
       const { host, time } = setup();
       await host.loaded;
       // 10 updates every 100 ms.
-      host.receive({ type: 'init', settings: { updatesPerBatch: 10, batchIntervalMs: 100 } });
-      host.receive({ type: 'start', runId: 1 });
+      host.receive({
+        type: 'start',
+        runId: 1,
+        settings: { updatesPerBatch: 10, batchIntervalMs: 100 },
+      });
       time.advance(300);
       host.receive({ type: 'pause-snapshots' });
       time.advance(2_000);
@@ -152,14 +155,14 @@ describe('ProducerWorkerHost', () => {
       log.mockRestore();
     });
 
-    it('starts runs with the settings from init', async () => {
+    it('starts runs with the settings sent with start', async () => {
       const { host, time, ofType } = setup();
       await host.loaded;
       host.receive({
-        type: 'init',
+        type: 'start',
+        runId: 9,
         settings: { instrumentCount: 4, updatesPerBatch: 250, batchIntervalMs: 125 },
       });
-      host.receive({ type: 'start', runId: 9 });
       time.advance(500);
       const last = ofType('snapshot').at(-1)!;
       expect(last.runId).toBe(9);
@@ -171,8 +174,14 @@ describe('ProducerWorkerHost', () => {
     it('rejects unknown or malformed messages with a readable error', async () => {
       const { host, ofType } = setup();
       await host.loaded;
-      // Unknown type, start without runId, init without settings, not an object, null.
-      for (const bad of [{ type: 'explode' }, { type: 'start' }, { type: 'init' }, 'start', null]) {
+      // Unknown type, start without runId, start without settings, not an object, null.
+      for (const bad of [
+        { type: 'explode' },
+        { type: 'start', settings: {} },
+        { type: 'start', runId: 1 },
+        'start',
+        null,
+      ]) {
         host.receive(bad);
       }
       expect(ofType('error')).toHaveLength(5);
@@ -185,7 +194,7 @@ describe('ProducerWorkerHost', () => {
     it('transfers the snapshot buffer instead of copying it', async () => {
       const { host, time, posted } = setup();
       await host.loaded;
-      host.receive({ type: 'start', runId: 1 });
+      host.receive({ type: 'start', runId: 1, settings: {} });
       // Default settings: the first batch lands after 500 ms, its snapshot within 100 ms.
       time.advance(600);
       const snapshot = posted.find((p) => p.message.type === 'snapshot')!;
@@ -196,7 +205,7 @@ describe('ProducerWorkerHost', () => {
     it('transfers nothing for other messages', async () => {
       const { host, posted } = setup();
       await host.loaded;
-      host.receive({ type: 'start', runId: 1 });
+      host.receive({ type: 'start', runId: 1, settings: {} });
       expect(
         posted.filter((p) => p.message.type !== 'snapshot').every((p) => p.transfer.length === 0),
       ).toBe(true);

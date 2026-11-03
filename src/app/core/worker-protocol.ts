@@ -6,14 +6,17 @@ export type WorkerStatus = 'idle' | 'running' | 'paused' | 'finished';
 /**
  * Messages the UI sends to the worker.
  *
- * `init` stores settings; `start` begins a fresh run with them under `runId`.
+ * `start` begins a fresh run with its settings under `runId`.
  * `pause-snapshots` / `resume-snapshots` stop and restart sending snapshots
  * (generation goes on), e.g. while the page is hidden.
  * Commands sent before the Wasm module is loaded are queued and run once it is.
  */
 export type WorkerCommand =
-  | { readonly type: 'init'; readonly settings: Partial<ProducerSettings> }
-  | { readonly type: 'start'; readonly runId: number }
+  | {
+      readonly type: 'start';
+      readonly runId: number;
+      readonly settings: Partial<ProducerSettings>;
+    }
   | { readonly type: 'pause' }
   | { readonly type: 'resume' }
   | { readonly type: 'finish' }
@@ -42,8 +45,18 @@ export type WorkerEvent =
       readonly message: string;
       /** Command that failed, when the error came from handling one. */
       readonly command?: WorkerCommandType;
+      /**
+       * Run the error belongs to: the one that failed, or the one a failed
+       * `start` was for. Absent when it concerns the whole worker (e.g. loading).
+       */
+      readonly runId?: number;
     }
-  | { readonly type: 'status'; readonly status: WorkerStatus };
+  | {
+      readonly type: 'status';
+      readonly status: WorkerStatus;
+      /** Run the status is about; 0 before the first `start`. */
+      readonly runId: number;
+    };
 
 export type WorkerCommandType = WorkerCommand['type'];
 export type WorkerEventType = WorkerEvent['type'];

@@ -98,19 +98,27 @@ describe('ProducerEngine', () => {
       expect(generators[0].instrumentCount).toBe(1);
     });
 
-    it('leaves the current run untouched if the new generator cannot be created', () => {
-      const { engine, time, snapshots, failNext } = setup();
+    // The UI has already switched to run 2, so a run 1 that kept going would
+    // generate for nobody.
+    it('finishes the current run if the new generator cannot be created', () => {
+      const { engine, time, events, generators, failNext } = setup();
       engine.start(1, settings);
       time.advance(200);
       failNext();
 
       expect(() => engine.start(2, settings)).toThrow('bad settings');
-      expect(engine.status).toBe('running');
-      expect(time.activeTimers).toBe(2);
-      time.advance(200);
-      expect(snapshots().at(-1)!.runId).toBe(1);
-      // 4 batches of 10: run 1 kept going after the failed switch.
-      expect(engine.totalUpdates).toBe(40);
+      expect(engine.status).toBe('finished');
+      expect(events.at(-1)).toEqual({ type: 'status', status: 'finished', runId: 1 });
+      expect(time.activeTimers).toBe(0);
+      expect(generators[0].generator.freed).toBe(1);
+    });
+
+    it('stays idle if the first generator cannot be created', () => {
+      const { engine, events, failNext } = setup();
+      failNext();
+      expect(() => engine.start(1, settings)).toThrow('bad settings');
+      expect(engine.status).toBe('idle');
+      expect(events).toEqual([]);
     });
   });
 
@@ -264,7 +272,7 @@ describe('ProducerEngine', () => {
 
         expect(snapshots().at(-1)!.totalUpdates).toBe(30);
         expect(volumeOf(snapshots().at(-1)!)).toBe(30);
-        expect(events.at(-1)).toEqual({ type: 'status', status: 'paused' });
+        expect(events.at(-1)).toEqual({ type: 'status', status: 'paused', runId: 1 });
       });
 
       it('sends nothing extra when nothing changed since the last snapshot', () => {
@@ -349,8 +357,8 @@ describe('ProducerEngine', () => {
         engine.start(1, settings);
         failNext();
         expect(() => engine.start(2, settings)).toThrow('bad settings');
-        // A failed start must not free the running generator.
-        expect(generators[0].generator.freed).toBe(0);
+        // The failed start finished run 1, which freed its generator.
+        expect(generators[0].generator.freed).toBe(1);
 
         engine.start(3, settings);
         expect(generators[0].generator.freed).toBe(1);
@@ -442,7 +450,7 @@ describe('ProducerEngine', () => {
       engine.finish();
 
       expect(snapshots().at(-1)!.totalUpdates).toBe(30);
-      expect(events.at(-1)).toEqual({ type: 'status', status: 'finished' });
+      expect(events.at(-1)).toEqual({ type: 'status', status: 'finished', runId: 1 });
     });
 
     it('stops the timers and ignores pause and resume afterwards', () => {
@@ -496,7 +504,7 @@ describe('ProducerEngine', () => {
     engine.start(1, settings);
     time.advance(settings.batchIntervalMs);
 
-    expect(events).toContainEqual({ type: 'error', message: 'wasm trapped' });
+    expect(events).toContainEqual({ type: 'error', message: 'wasm trapped', runId: 1 });
     expect(engine.status).toBe('finished');
     expect(time.activeTimers).toBe(0);
   });

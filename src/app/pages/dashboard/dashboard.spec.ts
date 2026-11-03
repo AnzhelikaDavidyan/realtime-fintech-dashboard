@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 
 import { InstrumentMetrics } from '../../core/instrument-metrics';
 import { encodeMetrics } from '../../core/metrics-codec';
-import { WorkerEvent } from '../../core/worker-protocol';
+import { WorkerEvent, WorkerStatus } from '../../core/worker-protocol';
 import { ProducerService } from '../../state/producer.service';
 import {
   FakeProducerWorker,
@@ -44,6 +44,12 @@ function setup() {
     totalUpdates,
     timestamp: 0,
   });
+  /** A status of the current run. */
+  const status = (value: WorkerStatus): WorkerEvent => ({
+    type: 'status',
+    status: value,
+    runId: producer.runId(),
+  });
   /** Text as a screen reader announces it: aria-hidden parts (icons, dashes, avatars) are skipped. */
   const text = (node: Element | null) => {
     if (!node) return '';
@@ -62,6 +68,7 @@ function setup() {
   const bodyRows = () => [...el.querySelectorAll('tbody tr')];
   const cells = (row: Element) => [...row.querySelectorAll('th, td')].map(text);
   return {
+    status,
     fixture,
     el,
     producer,
@@ -98,8 +105,8 @@ describe('Dashboard', () => {
     });
 
     it('stays in loading while running until the first snapshot arrives', async () => {
-      const { emit, banner, text } = setup();
-      await emit({ type: 'status', status: 'running' });
+      const { emit, banner, text, status } = setup();
+      await emit(status('running'));
       expect(text(banner())).toContain('Loading the Wasm generator');
     });
 
@@ -114,10 +121,10 @@ describe('Dashboard', () => {
 
   describe('running', () => {
     it('fills the table with formatted values and hides the banner', async () => {
-      const { producer, emit, snapshot, banner, bodyRows, cells, stat } = setup();
+      const { producer, emit, snapshot, banner, bodyRows, cells, stat, status } = setup();
       producer.apply({ instrumentCount: 2 });
       await emit(
-        { type: 'status', status: 'running' },
+        status('running'),
         snapshot([metrics(0), metrics(1, { imbalance: -0.35, lastPrice: 4_831 })]),
       );
 
@@ -136,10 +143,10 @@ describe('Dashboard', () => {
     });
 
     it('colours imbalance and draws its bar', async () => {
-      const { producer, emit, snapshot, el } = setup();
+      const { producer, emit, snapshot, el, status } = setup();
       producer.apply({ instrumentCount: 2 });
       await emit(
-        { type: 'status', status: 'running' },
+        status('running'),
         snapshot([metrics(0, { imbalance: 0.2 }), metrics(1, { imbalance: -0.35 })]),
       );
       const values = el.querySelectorAll('.imbalance__value');
@@ -149,10 +156,10 @@ describe('Dashboard', () => {
     });
 
     it('shows ▲ when a price rises and ▼ when it falls', async () => {
-      const { producer, emit, snapshot, el } = setup();
+      const { producer, emit, snapshot, el, status } = setup();
       producer.apply({ instrumentCount: 2 });
       await emit(
-        { type: 'status', status: 'running' },
+        status('running'),
         snapshot([metrics(0, { lastPrice: 100 }), metrics(1, { lastPrice: 100 })]),
       );
       // First snapshot: nothing to compare with yet, so no arrow.
@@ -165,9 +172,9 @@ describe('Dashboard', () => {
     });
 
     it('keeps the arrows after leaving the page and coming back', async () => {
-      const { producer, emit, snapshot } = setup();
+      const { producer, emit, snapshot, status } = setup();
       producer.apply({ instrumentCount: 1 });
-      await emit({ type: 'status', status: 'running' }, snapshot([metrics(0, { lastPrice: 100 })]));
+      await emit(status('running'), snapshot([metrics(0, { lastPrice: 100 })]));
       await emit(snapshot([metrics(0, { lastPrice: 99 })]));
 
       // A new component acts as coming back to the page; the arrows live in the service.
@@ -178,9 +185,9 @@ describe('Dashboard', () => {
     });
 
     it('reuses the arrow element when a price changes direction', async () => {
-      const { producer, emit, snapshot, el } = setup();
+      const { producer, emit, snapshot, el, status } = setup();
       producer.apply({ instrumentCount: 1 });
-      await emit({ type: 'status', status: 'running' }, snapshot([metrics(0, { lastPrice: 100 })]));
+      await emit(status('running'), snapshot([metrics(0, { lastPrice: 100 })]));
       await emit(snapshot([metrics(0, { lastPrice: 101 })]));
       const arrow = el.querySelector('.trend');
 
@@ -193,9 +200,9 @@ describe('Dashboard', () => {
     });
 
     it('keeps each symbol in the same row element while values update', async () => {
-      const { producer, emit, snapshot, bodyRows } = setup();
+      const { producer, emit, snapshot, bodyRows, status } = setup();
       producer.apply({ instrumentCount: 2 });
-      await emit({ type: 'status', status: 'running' }, snapshot([metrics(0), metrics(1)]));
+      await emit(status('running'), snapshot([metrics(0), metrics(1)]));
       const before = bodyRows();
       await emit(snapshot([metrics(0, { volume: 1 }), metrics(1, { volume: 2 })]));
       // Same element objects (tracked by instrument), so rows update in place.
@@ -205,10 +212,10 @@ describe('Dashboard', () => {
 
   describe('paused', () => {
     it('shows the paused banner and keeps the values', async () => {
-      const { producer, emit, snapshot, banner, bodyRows, cells, text } = setup();
+      const { producer, emit, snapshot, banner, bodyRows, cells, text, status } = setup();
       producer.apply({ instrumentCount: 1 });
-      await emit({ type: 'status', status: 'running' }, snapshot([metrics(0)]));
-      await emit({ type: 'status', status: 'paused' });
+      await emit(status('running'), snapshot([metrics(0)]));
+      await emit(status('paused'));
 
       expect(banner()?.classList).toContain('banner--paused');
       expect(text(banner())).toContain('Generation paused.');
@@ -274,11 +281,8 @@ describe('Dashboard', () => {
     });
 
     it('says the producer stopped when a run ends with an error', async () => {
-      const { emit, banner, text } = setup();
-      await emit(
-        { type: 'error', message: 'wasm trapped' },
-        { type: 'status', status: 'finished' },
-      );
+      const { emit, banner, text, status } = setup();
+      await emit({ type: 'error', message: 'wasm trapped' }, status('finished'));
       expect(text(banner())).toContain('Producer stopped. wasm trapped');
     });
   });

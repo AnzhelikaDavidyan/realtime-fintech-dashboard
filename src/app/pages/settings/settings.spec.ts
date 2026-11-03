@@ -55,8 +55,8 @@ function setup() {
     await fixture.whenStable();
   }
   const worker = () => workers.at(-1)!;
-  /** Commands sent after the default run started (init + start). */
-  const sent = () => worker().sent.slice(2);
+  /** Commands sent after the default run's `start`. */
+  const sent = () => worker().sent.slice(1);
   return {
     fixture,
     el,
@@ -265,7 +265,7 @@ describe('Settings page', () => {
       ['invalid', { instrumentCount: '', updatesPerBatch: '12.5', batchIntervalMs: '2001' }],
     ])('%s edits send nothing and keep the active run', async (_, values) => {
       const { type, producer, worker, sent } = setup();
-      worker().emit({ type: 'status', status: 'running' });
+      worker().emit({ type: 'status', status: 'running', runId: producer.runId() });
       for (const [key, value] of Object.entries(values)) {
         await type(key, value);
       }
@@ -294,7 +294,7 @@ describe('Settings page', () => {
       }
     }
 
-    it('sends init with every edited field and the kept seed, then starts the next run', async () => {
+    it('starts the next run with every edited field and the kept seed', async () => {
       const { type, apply, producer, sent, fixture } = setup();
       producer.apply({ ...DEFAULT_PRODUCER_SETTINGS, seed: 7 });
       const before = producer.runId();
@@ -306,8 +306,7 @@ describe('Settings page', () => {
 
       const expected = { seed: 7, ...edited };
       expect(sent().slice(sentBefore)).toEqual([
-        { type: 'init', settings: expected },
-        { type: 'start', runId: before + 1 },
+        { type: 'start', runId: before + 1, settings: expected },
       ]);
       expect(producer.runId()).toBe(before + 1);
       expect(producer.activeSettings()).toEqual(expected);
@@ -319,18 +318,17 @@ describe('Settings page', () => {
       el.querySelector('form')!.dispatchEvent(new Event('submit'));
       await fixture.whenStable();
       expect(sent()).toEqual([
-        { type: 'init', settings: { ...DEFAULT_PRODUCER_SETTINGS, ...edited } },
-        { type: 'start', runId: 2 },
+        { type: 'start', runId: 2, settings: { ...DEFAULT_PRODUCER_SETTINGS, ...edited } },
       ]);
     });
 
     it('starts a new run while paused', async () => {
       const { type, apply, worker, producer, sent, fixture } = setup();
-      worker().emit({ type: 'status', status: 'paused' });
+      worker().emit({ type: 'status', status: 'paused', runId: producer.runId() });
       await editAll(type);
       apply().click();
       await fixture.whenStable();
-      expect(sent().map((command) => command.type)).toEqual(['init', 'start']);
+      expect(sent().map((command) => command.type)).toEqual(['start']);
       expect(producer.runId()).toBe(2);
     });
 
@@ -341,8 +339,8 @@ describe('Settings page', () => {
       await fixture.whenStable();
       apply().click();
       await fixture.whenStable();
-      // One init + one start: the second click found nothing to apply.
-      expect(sent()).toHaveLength(2);
+      // One start: the second click found nothing to apply.
+      expect(sent()).toHaveLength(1);
     });
   });
 
@@ -443,8 +441,8 @@ describe('Settings page', () => {
     });
 
     it('ends with a toast and a highlighted active run', () => {
-      const { el, fixture, worker, apply, text } = startApplying();
-      worker().emit({ type: 'status', status: 'running' });
+      const { el, fixture, worker, apply, text, producer } = startApplying();
+      worker().emit({ type: 'status', status: 'running', runId: producer.runId() });
       render(fixture, MIN_APPLYING_MS);
 
       expect(el.querySelector('[role="progressbar"]')).toBeNull();
