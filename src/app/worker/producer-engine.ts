@@ -48,6 +48,10 @@ export const SNAPSHOT_INTERVAL_MS = 100;
  * `running`, and `resume` outside `paused`, are ignored. After `finish` only
  * `start` does anything.
  *
+ * `pause` and `finish` first send what changed since the last snapshot, so
+ * the UI stops on the final values rather than up to SNAPSHOT_INTERVAL_MS
+ * behind them.
+ *
  * Snapshots can be paused on their own (`pauseSnapshots`), e.g. while the page
  * is hidden: generation and totals go on, nothing is sent. This holds across
  * runs until `resumeSnapshots`, which sends the latest state at once.
@@ -100,11 +104,12 @@ export class ProducerEngine {
     this.setStatus('running');
   }
 
-  /** Stops generating; metrics are kept. */
+  /** Stops generating; metrics are kept and the latest ones are sent. */
   pause(): void {
     if (this.state !== 'running') {
       return;
     }
+    this.snapshot();
     this.stopTimers();
     this.setStatus('paused');
   }
@@ -130,17 +135,19 @@ export class ProducerEngine {
       return;
     }
     this.snapshotsPaused = false;
+    // Also after a pause or finish while hidden: their final values were not sent then.
+    this.snapshot();
     if (this.state === 'running') {
-      this.snapshot();
       this.startSnapshots();
     }
   }
 
-  /** Ends the run and releases the generator. */
+  /** Ends the run, sends its latest metrics and releases the generator. */
   finish(): void {
     if (this.state === 'finished') {
       return;
     }
+    this.snapshot();
     this.stopTimers();
     this.releaseGenerator();
     this.setStatus('finished');
@@ -164,8 +171,9 @@ export class ProducerEngine {
     }
   }
 
+  /** Sends the metrics if a batch changed them since the last snapshot and snapshots are on. */
   private snapshot(): void {
-    if (this.state !== 'running' || !this.metrics || !this.changed) {
+    if (this.snapshotsPaused || !this.metrics || !this.changed) {
       return;
     }
     this.changed = false;

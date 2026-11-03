@@ -191,7 +191,7 @@ describe('ProducerEngine', () => {
       expect(snapshots().map((s) => s.runId)).toEqual([2]);
     });
 
-    // A paused run has nothing new to show; its snapshots restart with `resume`.
+    // Pause already sent the final values; snapshots restart with `resume`.
     it('does not send or schedule snapshots on resume while the run is paused', () => {
       const { engine, time, snapshots } = setup();
       engine.start(1, settings);
@@ -207,6 +207,19 @@ describe('ProducerEngine', () => {
       engine.resume();
       time.advance(100);
       expect(snapshots()).toHaveLength(count + 1);
+    });
+
+    it('sends the final values on resume when the run was paused while hidden', () => {
+      const { engine, time, snapshots } = setup();
+      engine.start(1, settings);
+      engine.pauseSnapshots();
+      time.advance(300);
+      engine.pause();
+      expect(snapshots()).toHaveLength(0);
+
+      engine.resumeSnapshots();
+      expect(snapshots().map((s) => s.totalUpdates)).toEqual([30]);
+      expect(time.activeTimers).toBe(0);
     });
 
     it('ignores repeated pause or resume of snapshots', () => {
@@ -238,6 +251,29 @@ describe('ProducerEngine', () => {
         expect(generators[0].generator.requested).toHaveLength(calls);
         expect(engine.totalUpdates).toBe(20);
         expect(time.activeTimers).toBe(0);
+      });
+
+      // Regression: batches since the last snapshot used to stay unsent, so the
+      // paused screen showed totals up to 100 ms behind the real ones.
+      it('sends the batches since the last snapshot, then the paused status', () => {
+        const { engine, time, events, snapshots } = setup();
+        engine.start(1, { ...settings, batchIntervalMs: 50 });
+        time.advance(150); // snapshot at 100 ms with 20 updates, then one more batch
+        expect(snapshots().at(-1)!.totalUpdates).toBe(20);
+        engine.pause();
+
+        expect(snapshots().at(-1)!.totalUpdates).toBe(30);
+        expect(volumeOf(snapshots().at(-1)!)).toBe(30);
+        expect(events.at(-1)).toEqual({ type: 'status', status: 'paused' });
+      });
+
+      it('sends nothing extra when nothing changed since the last snapshot', () => {
+        const { engine, time, snapshots } = setup();
+        engine.start(1, settings);
+        time.advance(300);
+        const count = snapshots().length;
+        engine.pause();
+        expect(snapshots()).toHaveLength(count);
       });
 
       it('stops snapshots while paused', () => {
@@ -399,6 +435,16 @@ describe('ProducerEngine', () => {
   });
 
   describe('finish', () => {
+    it('sends the batches since the last snapshot before finishing', () => {
+      const { engine, time, events, snapshots } = setup();
+      engine.start(1, { ...settings, batchIntervalMs: 50 });
+      time.advance(150);
+      engine.finish();
+
+      expect(snapshots().at(-1)!.totalUpdates).toBe(30);
+      expect(events.at(-1)).toEqual({ type: 'status', status: 'finished' });
+    });
+
     it('stops the timers and ignores pause and resume afterwards', () => {
       const { engine, time, statuses } = setup();
       engine.start(1, settings);
